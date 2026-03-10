@@ -7,11 +7,13 @@ description: Reference for Claude's AI Buddies plugin
 
 ## Available Skills
 
-| Skill | Description |
-|-------|-------------|
-| `/codex "prompt"` | Ask Codex anything — brainstorm, delegate, second opinion |
-| `/codex-review` | Code review via Codex (uncommitted, branch, commit) |
-| `/codex-help` | This help reference |
+| Skill | Engine | Description |
+|-------|--------|-------------|
+| `/codex "prompt"` | Codex | Ask Codex anything — brainstorm, delegate, second opinion |
+| `/codex-review` | Codex | Code review via Codex (uncommitted, branch, commit) |
+| `/gemini "prompt"` | Gemini | Ask Gemini anything — brainstorm, delegate, second opinion |
+| `/gemini-review` | Gemini | Code review via Gemini (uncommitted, branch, commit) |
+| `/codex-help` | — | This help reference |
 
 ## Configuration
 
@@ -20,9 +22,11 @@ Config file: `~/.claudes-ai-buddies/config.json`
 | Key | Default | Description |
 |-----|---------|-------------|
 | `codex_model` | *(from ~/.codex/config.toml)* | Override Codex model |
+| `gemini_model` | `gemini-2.5-pro` | Override Gemini model |
 | `timeout` | `120` | Max seconds per call |
 | `sandbox` | `full-auto` | Sandbox mode (`full-auto` or `suggest`) |
 | `codex_path` | *(auto-detected)* | Explicit path to codex binary |
+| `gemini_path` | *(auto-detected)* | Explicit path to gemini binary |
 | `debug` | `false` | Enable debug logging |
 
 ### Example config
@@ -30,6 +34,7 @@ Config file: `~/.claudes-ai-buddies/config.json`
 ```json
 {
   "codex_model": "gpt-5.4-codex",
+  "gemini_model": "gemini-2.5-pro",
   "timeout": "180",
   "sandbox": "full-auto",
   "debug": "false"
@@ -39,18 +44,19 @@ Config file: `~/.claudes-ai-buddies/config.json`
 ## Review Targets
 
 ```
-/codex-review                        # uncommitted changes
+/codex-review                        # uncommitted changes (Codex)
 /codex-review branch:main            # diff from main to HEAD
-/codex-review commit:abc1234         # specific commit
-/codex-review "focus on security"    # with extra instructions
+/gemini-review                       # uncommitted changes (Gemini)
+/gemini-review commit:abc1234        # specific commit
 ```
 
 ## Requirements
 
 - **Codex CLI** v0.100.0+ (`npm install -g @openai/codex`)
-- **OpenAI auth** — either `codex auth login` (account) or `OPENAI_API_KEY` env var
+- **Gemini CLI** v0.30.0+ (`npm install -g @google/gemini-cli`)
+- **Auth** — `codex auth login` / `gemini auth login` (or API key env vars)
 - **jq** (optional, for config management)
-- **git** (required for `/codex-review`)
+- **git** (required for review skills)
 
 ## Debug Logging
 
@@ -65,8 +71,8 @@ Logs are written to `~/.claudes-ai-buddies/debug.log` (auto-rotated at 1MB).
 ## How It Works
 
 ```
-User → Claude → /codex skill → Bash(codex-run.sh) → codex exec → output file → Claude reads → presents
+User → Claude → /codex or /gemini skill → Bash(wrapper.sh) → CLI call → output file → Claude reads → presents
 ```
 
-Codex runs in `--ephemeral --full-auto` mode — stateless, no interactive prompts, no persistent state.
-Output is captured to a temp file via `-o`, which Claude reads and synthesizes.
+Both engines run in non-interactive/headless mode — stateless, no interactive prompts, no persistent state.
+Output is captured to a temp file, which Claude reads and synthesizes.

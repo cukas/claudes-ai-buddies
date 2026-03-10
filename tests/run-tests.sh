@@ -14,7 +14,7 @@ TOTAL=0
 # ── Test helpers ─────────────────────────────────────────────────────────────
 test_start() {
   TOTAL=$((TOTAL + 1))
-  printf "  [%02d] %-50s " "$TOTAL" "$1"
+  printf "  [%02d] %-55s " "$TOTAL" "$1"
 }
 
 test_pass() {
@@ -59,18 +59,18 @@ assert_exit_code() {
   fi
 }
 
-# ── Setup mock codex ─────────────────────────────────────────────────────────
+# ── Setup mock CLIs ──────────────────────────────────────────────────────────
 MOCK_DIR=$(mktemp -d)
+
+# Mock codex
 MOCK_CODEX="${MOCK_DIR}/codex"
 cat > "$MOCK_CODEX" <<'MOCK'
 #!/usr/bin/env bash
-# Mock codex CLI
 case "$1" in
   --version)
     echo "codex-cli 0.101.0 (mock)"
     ;;
   exec)
-    # Parse args to find -o flag
     OUTPUT_FILE=""
     PROMPT=""
     while [[ $# -gt 0 ]]; do
@@ -89,7 +89,23 @@ esac
 MOCK
 chmod +x "$MOCK_CODEX"
 
-# Override PATH to use mock
+# Mock gemini
+MOCK_GEMINI="${MOCK_DIR}/gemini"
+cat > "$MOCK_GEMINI" <<'MOCK'
+#!/usr/bin/env bash
+case "$1" in
+  --version)
+    echo "0.32.1 (mock)"
+    ;;
+  -p)
+    # Non-interactive mode: output to stdout
+    echo "Mock Gemini response to: $2"
+    ;;
+esac
+MOCK
+chmod +x "$MOCK_GEMINI"
+
+# Override PATH to use mocks
 export PATH="${MOCK_DIR}:${PATH}"
 
 # Setup temp config
@@ -105,20 +121,8 @@ echo ""
 echo "=== claudes-ai-buddies test suite ==="
 echo ""
 
-# ── lib.sh tests ─────────────────────────────────────────────────────────────
-echo "--- lib.sh ---"
-
-test_start "ai_buddies_find_codex finds mock"
-result=$(ai_buddies_find_codex)
-assert_contains "$result" "codex"
-
-test_start "ai_buddies_codex_version returns version"
-result=$(ai_buddies_codex_version)
-assert_contains "$result" "codex-cli"
-
-test_start "ai_buddies_codex_model fallback to gpt-5.4-codex"
-result=$(ai_buddies_codex_model)
-assert_eq "$result" "gpt-5.4-codex"
+# ── lib.sh — shared tests ───────────────────────────────────────────────────
+echo "--- lib.sh (shared) ---"
 
 test_start "ai_buddies_config returns default for missing key"
 result=$(ai_buddies_config "nonexistent" "mydefault")
@@ -147,22 +151,56 @@ fi
 
 test_start "ai_buddies_escape_json handles quotes"
 result=$(ai_buddies_escape_json 'hello "world"')
-# jq produces escaped quotes like \"
 if [[ "$result" == *'\"'* ]] || [[ "$result" == *'\\\"'* ]]; then
   test_pass
 else
   test_fail "expected escaped quotes in: $result"
 fi
 
+# ── lib.sh — codex tests ────────────────────────────────────────────────────
+echo ""
+echo "--- lib.sh (codex) ---"
+
+test_start "ai_buddies_find_codex finds mock"
+result=$(ai_buddies_find_codex)
+assert_contains "$result" "codex"
+
+test_start "ai_buddies_codex_version returns version"
+result=$(ai_buddies_codex_version)
+assert_contains "$result" "codex-cli"
+
+test_start "ai_buddies_codex_model fallback to gpt-5.4-codex"
+result=$(ai_buddies_codex_model)
+assert_eq "$result" "gpt-5.4-codex"
+
 test_start "ai_buddies_codex_model reads from config"
 ai_buddies_config_set "codex_model" "gpt-custom"
-# Reset cache
 unset _AI_BUDDIES_DEBUG_CACHED
 result=$(ai_buddies_codex_model)
 assert_eq "$result" "gpt-custom"
-
-# Reset model for remaining tests
 ai_buddies_config_set "codex_model" ""
+
+# ── lib.sh — gemini tests ───────────────────────────────────────────────────
+echo ""
+echo "--- lib.sh (gemini) ---"
+
+test_start "ai_buddies_find_gemini finds mock"
+result=$(ai_buddies_find_gemini)
+assert_contains "$result" "gemini"
+
+test_start "ai_buddies_gemini_version returns version"
+result=$(ai_buddies_gemini_version)
+assert_contains "$result" "0.32.1"
+
+test_start "ai_buddies_gemini_model fallback to gemini-2.5-pro"
+result=$(ai_buddies_gemini_model)
+assert_eq "$result" "gemini-2.5-pro"
+
+test_start "ai_buddies_gemini_model reads from config"
+ai_buddies_config_set "gemini_model" "gemini-custom"
+result=$(ai_buddies_gemini_model)
+assert_eq "$result" "gemini-custom"
+ai_buddies_config_set "gemini_model" ""
 
 # ── session-start.sh tests ───────────────────────────────────────────────────
 echo ""
@@ -173,14 +211,17 @@ output=$(bash "${PLUGIN_ROOT}/hooks/session-start.sh" 2>&1)
 ec=$?
 assert_exit_code "$ec" 0
 
-test_start "session-start.sh shows version"
-assert_contains "$output" "codex-cli"
+test_start "session-start.sh shows Codex"
+assert_contains "$output" "Codex"
 
-test_start "session-start.sh shows model"
-assert_contains "$output" "model:"
+test_start "session-start.sh shows Gemini"
+assert_contains "$output" "Gemini"
 
 test_start "session-start.sh mentions /codex skill"
 assert_contains "$output" "/codex"
+
+test_start "session-start.sh mentions /gemini skill"
+assert_contains "$output" "/gemini"
 
 # ── codex-run.sh tests ──────────────────────────────────────────────────────
 echo ""
@@ -192,26 +233,19 @@ assert_contains "$output" "ERROR"
 
 test_start "codex-run.sh exec mode produces output file"
 output=$(bash "${PLUGIN_ROOT}/scripts/codex-run.sh" --prompt "test query" --mode exec 2>&1)
-if [[ -f "$output" ]]; then
-  content=$(cat "$output")
+trimmed=$(echo "$output" | tail -1)
+if [[ -f "$trimmed" ]]; then
+  content=$(cat "$trimmed")
   test_pass
 else
-  # output itself might contain the path
-  trimmed=$(echo "$output" | tail -1)
-  if [[ -f "$trimmed" ]]; then
-    content=$(cat "$trimmed")
-    test_pass
-  else
-    test_fail "output file not found: $output"
-    content=""
-  fi
+  test_fail "output file not found: $trimmed"
+  content=""
 fi
 
 test_start "codex exec output contains response"
 assert_contains "${content:-}" "Mock Codex response"
 
 test_start "codex-run.sh review mode produces output"
-# Create a temp git repo for review test
 REVIEW_REPO=$(mktemp -d)
 cd "$REVIEW_REPO"
 git init -q
@@ -228,6 +262,51 @@ trimmed=$(echo "$output" | tail -1)
 if [[ -f "$trimmed" ]]; then
   content=$(cat "$trimmed")
   assert_contains "$content" "Mock Codex response"
+else
+  test_fail "review output file not found"
+fi
+cd "$PLUGIN_ROOT"
+rm -rf "$REVIEW_REPO"
+
+# ── gemini-run.sh tests ─────────────────────────────────────────────────────
+echo ""
+echo "--- gemini-run.sh ---"
+
+test_start "gemini-run.sh requires --prompt"
+output=$(bash "${PLUGIN_ROOT}/scripts/gemini-run.sh" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "gemini-run.sh exec mode produces output file"
+output=$(bash "${PLUGIN_ROOT}/scripts/gemini-run.sh" --prompt "test query" --mode exec 2>&1)
+trimmed=$(echo "$output" | tail -1)
+if [[ -f "$trimmed" ]]; then
+  content=$(cat "$trimmed")
+  test_pass
+else
+  test_fail "output file not found: $trimmed"
+  content=""
+fi
+
+test_start "gemini exec output contains response"
+assert_contains "${content:-}" "Mock Gemini response"
+
+test_start "gemini-run.sh review mode produces output"
+REVIEW_REPO=$(mktemp -d)
+cd "$REVIEW_REPO"
+git init -q
+echo "initial" > file.txt
+git add file.txt
+git commit -q -m "init"
+echo "changed" > file.txt
+output=$(bash "${PLUGIN_ROOT}/scripts/gemini-run.sh" \
+  --prompt "review this" \
+  --cwd "$REVIEW_REPO" \
+  --mode review \
+  --review-target uncommitted 2>&1)
+trimmed=$(echo "$output" | tail -1)
+if [[ -f "$trimmed" ]]; then
+  content=$(cat "$trimmed")
+  assert_contains "$content" "Mock Gemini response"
 else
   test_fail "review output file not found"
 fi
@@ -253,11 +332,20 @@ assert_file_exists "${PLUGIN_ROOT}/skills/codex/SKILL.md"
 test_start "codex-review SKILL.md exists"
 assert_file_exists "${PLUGIN_ROOT}/skills/codex-review/SKILL.md"
 
+test_start "gemini SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/gemini/SKILL.md"
+
+test_start "gemini-review SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/gemini-review/SKILL.md"
+
 test_start "codex-help.md exists"
 assert_file_exists "${PLUGIN_ROOT}/commands/codex-help.md"
 
-test_start "codex-run.sh is executable or exists"
+test_start "codex-run.sh exists"
 assert_file_exists "${PLUGIN_ROOT}/scripts/codex-run.sh"
+
+test_start "gemini-run.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/gemini-run.sh"
 
 test_start "plugin.json is valid JSON"
 if jq . "${PLUGIN_ROOT}/.claude-plugin/plugin.json" &>/dev/null; then

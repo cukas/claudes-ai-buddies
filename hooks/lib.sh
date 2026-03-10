@@ -148,6 +148,61 @@ ai_buddies_codex_model() {
   echo "gpt-5.4-codex"
 }
 
+# ── Find gemini binary ───────────────────────────────────────────────────────
+ai_buddies_find_gemini() {
+  # Check explicit config override first
+  local configured
+  configured="$(ai_buddies_config "gemini_path" "")"
+  if [[ -n "$configured" && -x "$configured" ]]; then
+    echo "$configured"
+    return 0
+  fi
+
+  # Standard PATH lookup
+  if command -v gemini &>/dev/null; then
+    command -v gemini
+    return 0
+  fi
+
+  # Common install locations
+  local candidates=(
+    "${HOME}/.nvm/versions/node/*/bin/gemini"
+    "${HOME}/.local/bin/gemini"
+    "/usr/local/bin/gemini"
+  )
+  for pattern in "${candidates[@]}"; do
+    # shellcheck disable=SC2086
+    for bin in $pattern; do
+      if [[ -x "$bin" ]]; then
+        echo "$bin"
+        return 0
+      fi
+    done
+  done
+
+  return 1
+}
+
+# ── Get gemini version ───────────────────────────────────────────────────────
+ai_buddies_gemini_version() {
+  local gemini_bin
+  gemini_bin="$(ai_buddies_find_gemini 2>/dev/null)" || return 1
+  "$gemini_bin" --version 2>/dev/null | head -1
+}
+
+# ── Get gemini model ────────────────────────────────────────────────────────
+# Priority: plugin config → fallback
+ai_buddies_gemini_model() {
+  local model
+  model="$(ai_buddies_config "gemini_model" "")"
+  if [[ -n "$model" ]]; then
+    echo "$model"
+    return 0
+  fi
+
+  echo "gemini-2.5-pro"
+}
+
 # ── Get sandbox mode ────────────────────────────────────────────────────────
 ai_buddies_sandbox() {
   ai_buddies_config "sandbox" "full-auto"
