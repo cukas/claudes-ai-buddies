@@ -101,13 +101,14 @@ if [[ "$MODE" == "review" ]]; then
   FINAL_PROMPT="$(build_review_prompt "$REVIEW_TARGET")"
 fi
 
-# ── Map sandbox to gemini's --sandbox flag ───────────────────────────────────
-# Gemini uses: --sandbox full-auto | --sandbox suggest
-GEMINI_SANDBOX_FLAG=""
+# ── Map sandbox to gemini CLI flags ──────────────────────────────────────────
+# Gemini uses: --sandbox (boolean) + --approval-mode yolo|default|auto_edit|plan
+# NOT --sandbox <value> — that's a different CLI (codex).
+GEMINI_SANDBOX_ARGS=()
 case "$SANDBOX" in
-  full-auto) GEMINI_SANDBOX_FLAG="--sandbox full-auto" ;;
-  suggest)   GEMINI_SANDBOX_FLAG="--sandbox suggest" ;;
-  *)         GEMINI_SANDBOX_FLAG="--sandbox full-auto" ;;
+  full-auto) GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode yolo) ;;
+  suggest)   GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode default) ;;
+  *)         GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode yolo) ;;
 esac
 
 # ── Run gemini ───────────────────────────────────────────────────────────────
@@ -142,10 +143,9 @@ GEMINI_ARGS=(-p "$FINAL_PROMPT")
 [[ -n "$MODEL" ]] && GEMINI_ARGS+=(--model "$MODEL")
 
 # Gemini uses -p for non-interactive (headless) mode, output goes to stdout
-# shellcheck disable=SC2086
 run_with_timeout "$TIMEOUT" "$GEMINI_BIN" \
   "${GEMINI_ARGS[@]}" \
-  $GEMINI_SANDBOX_FLAG \
+  "${GEMINI_SANDBOX_ARGS[@]}" \
   > "$OUTPUT_FILE" 2>"$ERROR_FILE" || EXIT_CODE=$?
 
 # ── Handle result ────────────────────────────────────────────────────────────
