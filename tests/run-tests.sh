@@ -223,6 +223,9 @@ assert_contains "$output" "/codex"
 test_start "session-start.sh mentions /gemini skill"
 assert_contains "$output" "/gemini"
 
+test_start "session-start.sh mentions /brainstorm skill"
+assert_contains "$output" "/brainstorm"
+
 # ── codex-run.sh tests ──────────────────────────────────────────────────────
 echo ""
 echo "--- codex-run.sh ---"
@@ -337,6 +340,9 @@ assert_file_exists "${PLUGIN_ROOT}/skills/gemini/SKILL.md"
 
 test_start "gemini-review SKILL.md exists"
 assert_file_exists "${PLUGIN_ROOT}/skills/gemini-review/SKILL.md"
+
+test_start "brainstorm SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/brainstorm/SKILL.md"
 
 test_start "buddy-help.md exists"
 assert_file_exists "${PLUGIN_ROOT}/commands/buddy-help.md"

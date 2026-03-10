@@ -13,6 +13,7 @@ description: Reference for Claude's AI Buddies plugin
 | `/codex-review` | Codex | Code review via Codex (uncommitted, branch, commit) |
 | `/gemini "prompt"` | Gemini | Ask Gemini anything — brainstorm, delegate, second opinion |
 | `/gemini-review` | Gemini | Code review via Gemini (uncommitted, branch, commit) |
+| `/brainstorm "topic"` | All | Multi-AI roundtable — Codex + Gemini + Claude perspectives |
 | `/buddy-help` | — | This help reference |
 
 ## Configuration
