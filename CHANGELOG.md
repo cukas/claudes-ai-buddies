@@ -11,3 +11,7 @@
 - Config cascade: plugin config → codex config.toml → defaults
 - Debug logging with auto-rotation
 - Test suite with mock codex
+
+### Note
+- Renamed from `claudes-codex-buddy` to `claudes-ai-buddies` for multi-engine support
+- Gemini CLI integration planned

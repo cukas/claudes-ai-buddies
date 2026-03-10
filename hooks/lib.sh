@@ -1,47 +1,47 @@
 #!/usr/bin/env bash
-# claudes-codex-buddy — shared helpers
+# claudes-ai-buddies — shared helpers
 # Sourced by hooks and scripts. Never executed directly.
 
 set -euo pipefail
 
 # ── Constants ────────────────────────────────────────────────────────────────
-CODEX_BUDDY_HOME="${HOME}/.claudes-codex-buddy"
-CODEX_BUDDY_CONFIG="${CODEX_BUDDY_HOME}/config.json"
-CODEX_BUDDY_DEBUG_LOG="${CODEX_BUDDY_HOME}/debug.log"
-CODEX_BUDDY_MAX_LOG_SIZE=1048576  # 1MB
+AI_BUDDIES_HOME="${HOME}/.claudes-ai-buddies"
+AI_BUDDIES_CONFIG="${AI_BUDDIES_HOME}/config.json"
+AI_BUDDIES_DEBUG_LOG="${AI_BUDDIES_HOME}/debug.log"
+AI_BUDDIES_MAX_LOG_SIZE=1048576  # 1MB
 
 # ── Debug logging ────────────────────────────────────────────────────────────
-codex_buddy_debug() {
-  local debug_enabled="${_CODEX_BUDDY_DEBUG_CACHED:-}"
+ai_buddies_debug() {
+  local debug_enabled="${_AI_BUDDIES_DEBUG_CACHED:-}"
   if [[ -z "$debug_enabled" ]]; then
-    debug_enabled="$(codex_buddy_config "debug" "false")"
-    export _CODEX_BUDDY_DEBUG_CACHED="$debug_enabled"
+    debug_enabled="$(ai_buddies_config "debug" "false")"
+    export _AI_BUDDIES_DEBUG_CACHED="$debug_enabled"
   fi
   [[ "$debug_enabled" != "true" ]] && return 0
 
-  mkdir -p "$CODEX_BUDDY_HOME"
+  mkdir -p "$AI_BUDDIES_HOME"
 
   # Rotate if too large
-  if [[ -f "$CODEX_BUDDY_DEBUG_LOG" ]]; then
+  if [[ -f "$AI_BUDDIES_DEBUG_LOG" ]]; then
     local size
-    size=$(wc -c < "$CODEX_BUDDY_DEBUG_LOG" 2>/dev/null || echo 0)
-    if (( size > CODEX_BUDDY_MAX_LOG_SIZE )); then
-      mv "$CODEX_BUDDY_DEBUG_LOG" "${CODEX_BUDDY_DEBUG_LOG}.old"
+    size=$(wc -c < "$AI_BUDDIES_DEBUG_LOG" 2>/dev/null || echo 0)
+    if (( size > AI_BUDDIES_MAX_LOG_SIZE )); then
+      mv "$AI_BUDDIES_DEBUG_LOG" "${AI_BUDDIES_DEBUG_LOG}.old"
     fi
   fi
 
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$CODEX_BUDDY_DEBUG_LOG"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$AI_BUDDIES_DEBUG_LOG"
 }
 
 # ── Config reader ────────────────────────────────────────────────────────────
-# Usage: codex_buddy_config "key" "default_value"
-codex_buddy_config() {
+# Usage: ai_buddies_config "key" "default_value"
+ai_buddies_config() {
   local key="$1"
   local default="${2:-}"
 
-  if [[ -f "$CODEX_BUDDY_CONFIG" ]] && command -v jq &>/dev/null; then
+  if [[ -f "$AI_BUDDIES_CONFIG" ]] && command -v jq &>/dev/null; then
     local val
-    val=$(jq -r --arg k "$key" '.[$k] // empty' "$CODEX_BUDDY_CONFIG" 2>/dev/null)
+    val=$(jq -r --arg k "$key" '.[$k] // empty' "$AI_BUDDIES_CONFIG" 2>/dev/null)
     if [[ -n "$val" ]]; then
       echo "$val"
       return 0
@@ -52,31 +52,31 @@ codex_buddy_config() {
 }
 
 # ── Config writer ────────────────────────────────────────────────────────────
-# Usage: codex_buddy_config_set "key" "value"
-codex_buddy_config_set() {
+# Usage: ai_buddies_config_set "key" "value"
+ai_buddies_config_set() {
   local key="$1"
   local value="$2"
 
-  mkdir -p "$CODEX_BUDDY_HOME"
+  mkdir -p "$AI_BUDDIES_HOME"
 
   if ! command -v jq &>/dev/null; then
-    codex_buddy_debug "jq not found, cannot write config"
+    ai_buddies_debug "jq not found, cannot write config"
     return 1
   fi
 
   local existing="{}"
-  [[ -f "$CODEX_BUDDY_CONFIG" ]] && existing=$(cat "$CODEX_BUDDY_CONFIG")
+  [[ -f "$AI_BUDDIES_CONFIG" ]] && existing=$(cat "$AI_BUDDIES_CONFIG")
 
-  local tmp="${CODEX_BUDDY_CONFIG}.tmp.$$"
+  local tmp="${AI_BUDDIES_CONFIG}.tmp.$$"
   echo "$existing" | jq --arg k "$key" --arg v "$value" '.[$k] = $v' > "$tmp"
-  mv "$tmp" "$CODEX_BUDDY_CONFIG"
+  mv "$tmp" "$AI_BUDDIES_CONFIG"
 }
 
 # ── Find codex binary ───────────────────────────────────────────────────────
-codex_buddy_find_codex() {
+ai_buddies_find_codex() {
   # Check explicit config override first
   local configured
-  configured="$(codex_buddy_config "codex_path" "")"
+  configured="$(ai_buddies_config "codex_path" "")"
   if [[ -n "$configured" && -x "$configured" ]]; then
     echo "$configured"
     return 0
@@ -108,26 +108,26 @@ codex_buddy_find_codex() {
 }
 
 # ── Get codex version ───────────────────────────────────────────────────────
-codex_buddy_version() {
+ai_buddies_codex_version() {
   local codex_bin
-  codex_bin="$(codex_buddy_find_codex 2>/dev/null)" || return 1
+  codex_bin="$(ai_buddies_find_codex 2>/dev/null)" || return 1
   "$codex_bin" --version 2>/dev/null | head -1
 }
 
 # ── Session directory ────────────────────────────────────────────────────────
-codex_buddy_session_dir() {
+ai_buddies_session_dir() {
   local session_id="${CLAUDE_SESSION_ID:-default}"
-  local dir="/tmp/codex-buddy-${session_id}"
+  local dir="/tmp/ai-buddies-${session_id}"
   mkdir -p "$dir"
   echo "$dir"
 }
 
 # ── Get model from config cascade ───────────────────────────────────────────
 # Priority: plugin config → codex config.toml → fallback
-codex_buddy_model() {
+ai_buddies_codex_model() {
   # 1. Plugin config
   local model
-  model="$(codex_buddy_config "model" "")"
+  model="$(ai_buddies_config "codex_model" "")"
   if [[ -n "$model" ]]; then
     echo "$model"
     return 0
@@ -149,17 +149,17 @@ codex_buddy_model() {
 }
 
 # ── Get sandbox mode ────────────────────────────────────────────────────────
-codex_buddy_sandbox() {
-  codex_buddy_config "sandbox" "full-auto"
+ai_buddies_sandbox() {
+  ai_buddies_config "sandbox" "full-auto"
 }
 
 # ── Get default timeout (seconds) ───────────────────────────────────────────
-codex_buddy_timeout() {
-  codex_buddy_config "timeout" "120"
+ai_buddies_timeout() {
+  ai_buddies_config "timeout" "120"
 }
 
 # ── JSON escape ──────────────────────────────────────────────────────────────
-codex_buddy_escape_json() {
+ai_buddies_escape_json() {
   local input="$1"
   if command -v jq &>/dev/null; then
     printf '%s' "$input" | jq -Rs .

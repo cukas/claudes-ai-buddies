@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claudes-codex-buddy — test suite
+# claudes-ai-buddies — test suite
 # Usage: bash tests/run-tests.sh
 
 set -euo pipefail
@@ -95,58 +95,58 @@ export PATH="${MOCK_DIR}:${PATH}"
 # Setup temp config
 TEST_HOME=$(mktemp -d)
 export HOME="$TEST_HOME"
-export CODEX_BUDDY_HOME="${TEST_HOME}/.claudes-codex-buddy"
+export AI_BUDDIES_HOME="${TEST_HOME}/.claudes-ai-buddies"
 export CLAUDE_SESSION_ID="test-session-$$"
 
 # ── Source lib ───────────────────────────────────────────────────────────────
 source "${PLUGIN_ROOT}/hooks/lib.sh"
 
 echo ""
-echo "=== claudes-codex-buddy test suite ==="
+echo "=== claudes-ai-buddies test suite ==="
 echo ""
 
 # ── lib.sh tests ─────────────────────────────────────────────────────────────
 echo "--- lib.sh ---"
 
-test_start "codex_buddy_find_codex finds mock"
-result=$(codex_buddy_find_codex)
+test_start "ai_buddies_find_codex finds mock"
+result=$(ai_buddies_find_codex)
 assert_contains "$result" "codex"
 
-test_start "codex_buddy_version returns version"
-result=$(codex_buddy_version)
+test_start "ai_buddies_codex_version returns version"
+result=$(ai_buddies_codex_version)
 assert_contains "$result" "codex-cli"
 
-test_start "codex_buddy_model fallback to gpt-5.4-codex"
-result=$(codex_buddy_model)
+test_start "ai_buddies_codex_model fallback to gpt-5.4-codex"
+result=$(ai_buddies_codex_model)
 assert_eq "$result" "gpt-5.4-codex"
 
-test_start "codex_buddy_config returns default for missing key"
-result=$(codex_buddy_config "nonexistent" "mydefault")
+test_start "ai_buddies_config returns default for missing key"
+result=$(ai_buddies_config "nonexistent" "mydefault")
 assert_eq "$result" "mydefault"
 
-test_start "codex_buddy_config_set writes config"
-codex_buddy_config_set "test_key" "test_value"
-result=$(codex_buddy_config "test_key" "")
+test_start "ai_buddies_config_set writes config"
+ai_buddies_config_set "test_key" "test_value"
+result=$(ai_buddies_config "test_key" "")
 assert_eq "$result" "test_value"
 
-test_start "codex_buddy_timeout returns default 120"
-result=$(codex_buddy_timeout)
+test_start "ai_buddies_timeout returns default 120"
+result=$(ai_buddies_timeout)
 assert_eq "$result" "120"
 
-test_start "codex_buddy_sandbox returns default full-auto"
-result=$(codex_buddy_sandbox)
+test_start "ai_buddies_sandbox returns default full-auto"
+result=$(ai_buddies_sandbox)
 assert_eq "$result" "full-auto"
 
-test_start "codex_buddy_session_dir creates directory"
-result=$(codex_buddy_session_dir)
+test_start "ai_buddies_session_dir creates directory"
+result=$(ai_buddies_session_dir)
 if [[ -d "$result" ]]; then
   test_pass
 else
   test_fail "directory not found: $result"
 fi
 
-test_start "codex_buddy_escape_json handles quotes"
-result=$(codex_buddy_escape_json 'hello "world"')
+test_start "ai_buddies_escape_json handles quotes"
+result=$(ai_buddies_escape_json 'hello "world"')
 # jq produces escaped quotes like \"
 if [[ "$result" == *'\"'* ]] || [[ "$result" == *'\\\"'* ]]; then
   test_pass
@@ -154,15 +154,15 @@ else
   test_fail "expected escaped quotes in: $result"
 fi
 
-test_start "codex_buddy_model reads from config"
-codex_buddy_config_set "model" "gpt-custom"
+test_start "ai_buddies_codex_model reads from config"
+ai_buddies_config_set "codex_model" "gpt-custom"
 # Reset cache
-unset _CODEX_BUDDY_DEBUG_CACHED
-result=$(codex_buddy_model)
+unset _AI_BUDDIES_DEBUG_CACHED
+result=$(ai_buddies_codex_model)
 assert_eq "$result" "gpt-custom"
 
 # Reset model for remaining tests
-codex_buddy_config_set "model" ""
+ai_buddies_config_set "codex_model" ""
 
 # ── session-start.sh tests ───────────────────────────────────────────────────
 echo ""

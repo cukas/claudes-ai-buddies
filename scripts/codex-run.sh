@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claudes-codex-buddy — core wrapper for codex exec
+# claudes-ai-buddies — core wrapper for codex exec
 # Usage: codex-run.sh --prompt "..." [--cwd DIR] [--mode exec|review]
 #        [--review-target uncommitted|branch:NAME|commit:SHA]
 #        [--timeout SECS] [--model MODEL] [--sandbox MODE]
@@ -16,9 +16,9 @@ PROMPT=""
 CWD="$(pwd)"
 MODE="exec"
 REVIEW_TARGET="uncommitted"
-TIMEOUT="$(codex_buddy_timeout)"
-MODEL="$(codex_buddy_model)"
-SANDBOX="$(codex_buddy_sandbox)"
+TIMEOUT="$(ai_buddies_timeout)"
+MODEL="$(ai_buddies_codex_model)"
+SANDBOX="$(ai_buddies_sandbox)"
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -43,15 +43,15 @@ if [[ -z "$PROMPT" ]]; then
 fi
 
 # ── Find codex ───────────────────────────────────────────────────────────────
-CODEX_BIN="$(codex_buddy_find_codex 2>/dev/null)" || {
+CODEX_BIN="$(ai_buddies_find_codex 2>/dev/null)" || {
   echo "ERROR: codex CLI not found. Install: npm install -g @openai/codex" >&2
   exit 1
 }
 
-codex_buddy_debug "codex-run: mode=$MODE, model=$MODEL, timeout=$TIMEOUT, cwd=$CWD"
+ai_buddies_debug "codex-run: mode=$MODE, model=$MODEL, timeout=$TIMEOUT, cwd=$CWD"
 
 # ── Prepare output ───────────────────────────────────────────────────────────
-SESSION_DIR="$(codex_buddy_session_dir)"
+SESSION_DIR="$(ai_buddies_session_dir)"
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 OUTPUT_FILE="${SESSION_DIR}/codex-output-${TIMESTAMP}.md"
 ERROR_FILE="${SESSION_DIR}/codex-error-${TIMESTAMP}.log"
@@ -102,7 +102,7 @@ if [[ "$MODE" == "review" ]]; then
 fi
 
 # ── Run codex ────────────────────────────────────────────────────────────────
-codex_buddy_debug "codex-run: executing codex exec"
+ai_buddies_debug "codex-run: executing codex exec"
 
 # Build command array
 CODEX_ARGS=(
@@ -143,7 +143,7 @@ run_with_timeout "$TIMEOUT" "$CODEX_BIN" "${CODEX_ARGS[@]}" 2>"$ERROR_FILE" || E
 # ── Handle result ────────────────────────────────────────────────────────────
 if [[ $EXIT_CODE -eq 124 ]]; then
   echo "TIMEOUT: Codex did not respond within ${TIMEOUT}s" > "$OUTPUT_FILE"
-  codex_buddy_debug "codex-run: timed out after ${TIMEOUT}s"
+  ai_buddies_debug "codex-run: timed out after ${TIMEOUT}s"
 elif [[ $EXIT_CODE -ne 0 ]]; then
   {
     echo "ERROR: Codex exited with code ${EXIT_CODE}"
@@ -151,15 +151,15 @@ elif [[ $EXIT_CODE -ne 0 ]]; then
     echo "--- stderr ---"
     cat "$ERROR_FILE" 2>/dev/null || echo "(no stderr captured)"
   } > "$OUTPUT_FILE"
-  codex_buddy_debug "codex-run: failed with exit code ${EXIT_CODE}"
+  ai_buddies_debug "codex-run: failed with exit code ${EXIT_CODE}"
 fi
 
 # ── Output the file path for Claude to read ──────────────────────────────────
 if [[ -f "$OUTPUT_FILE" ]]; then
   echo "$OUTPUT_FILE"
-  codex_buddy_debug "codex-run: output at ${OUTPUT_FILE}"
+  ai_buddies_debug "codex-run: output at ${OUTPUT_FILE}"
 else
   echo "ERROR: No output file generated" >&2
-  codex_buddy_debug "codex-run: no output file"
+  ai_buddies_debug "codex-run: no output file"
   exit 1
 fi

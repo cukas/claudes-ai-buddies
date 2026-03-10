@@ -1,10 +1,10 @@
 {
-  "name": "claudes-codex-buddy",
-  "description": "Use OpenAI Codex CLI as a peer AI from Claude Code — brainstorm, delegate, review",
+  "name": "claudes-ai-buddies",
+  "description": "Use peer AI CLIs (Codex, Gemini) from Claude Code — brainstorm, delegate, review",
   "version": "1.0.0",
   "author": { "name": "cukas" },
-  "homepage": "https://github.com/cukas/claudes-codex-buddy",
-  "repository": "https://github.com/cukas/claudes-codex-buddy",
+  "homepage": "https://github.com/cukas/claudes-ai-buddies",
+  "repository": "https://github.com/cukas/claudes-ai-buddies",
   "license": "MIT",
-  "keywords": ["codex", "openai", "peer-ai", "code-review", "brainstorm"]
+  "keywords": ["codex", "gemini", "openai", "peer-ai", "code-review", "brainstorm"]
 }

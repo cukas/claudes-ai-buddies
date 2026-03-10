@@ -1,9 +1,9 @@
 ---
 name: codex-help
-description: Reference for Claude's Codex Buddy plugin
+description: Reference for Claude's AI Buddies plugin
 ---
 
-# Codex Buddy — Help & Reference
+# AI Buddies — Help & Reference
 
 ## Available Skills
 
@@ -15,12 +15,12 @@ description: Reference for Claude's Codex Buddy plugin
 
 ## Configuration
 
-Config file: `~/.claudes-codex-buddy/config.json`
+Config file: `~/.claudes-ai-buddies/config.json`
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `model` | *(from ~/.codex/config.toml)* | Override Codex model |
-| `timeout` | `120` | Max seconds per Codex call |
+| `codex_model` | *(from ~/.codex/config.toml)* | Override Codex model |
+| `timeout` | `120` | Max seconds per call |
 | `sandbox` | `full-auto` | Sandbox mode (`full-auto` or `suggest`) |
 | `codex_path` | *(auto-detected)* | Explicit path to codex binary |
 | `debug` | `false` | Enable debug logging |
@@ -29,7 +29,7 @@ Config file: `~/.claudes-codex-buddy/config.json`
 
 ```json
 {
-  "model": "gpt-5.4-codex",
+  "codex_model": "gpt-5.4-codex",
   "timeout": "180",
   "sandbox": "full-auto",
   "debug": "false"
@@ -48,7 +48,7 @@ Config file: `~/.claudes-codex-buddy/config.json`
 ## Requirements
 
 - **Codex CLI** v0.100.0+ (`npm install -g @openai/codex`)
-- **OpenAI API key** configured for Codex (`OPENAI_API_KEY` env var)
+- **OpenAI auth** — either `codex auth login` (account) or `OPENAI_API_KEY` env var
 - **jq** (optional, for config management)
 - **git** (required for `/codex-review`)
 
@@ -56,11 +56,11 @@ Config file: `~/.claudes-codex-buddy/config.json`
 
 Enable debug mode:
 ```bash
-mkdir -p ~/.claudes-codex-buddy
-echo '{"debug": "true"}' > ~/.claudes-codex-buddy/config.json
+mkdir -p ~/.claudes-ai-buddies
+echo '{"debug": "true"}' > ~/.claudes-ai-buddies/config.json
 ```
 
-Logs are written to `~/.claudes-codex-buddy/debug.log` (auto-rotated at 1MB).
+Logs are written to `~/.claudes-ai-buddies/debug.log` (auto-rotated at 1MB).
 
 ## How It Works
 

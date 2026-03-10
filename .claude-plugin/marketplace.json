@@ -1,18 +1,18 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "cukas",
-  "description": "Claude's Codex Buddy — peer AI integration plugin",
+  "description": "Claude's AI Buddies — peer AI integration plugin",
   "owner": { "name": "cukas" },
   "plugins": [
     {
-      "name": "claudes-codex-buddy",
-      "description": "Spawn OpenAI Codex CLI directly from Claude Code for brainstorming, delegation, and code reviews",
+      "name": "claudes-ai-buddies",
+      "description": "Spawn peer AI CLIs (Codex, Gemini) from Claude Code for brainstorming, delegation, and code reviews",
       "version": "1.0.0",
       "author": { "name": "cukas" },
       "source": "./",
       "category": "development",
-      "homepage": "https://github.com/cukas/claudes-codex-buddy",
-      "tags": ["codex", "openai", "peer-ai", "code-review", "brainstorm"]
+      "homepage": "https://github.com/cukas/claudes-ai-buddies",
+      "tags": ["codex", "gemini", "openai", "peer-ai", "code-review", "brainstorm", "claude-code-plugin"]
     }
   ]
 }
