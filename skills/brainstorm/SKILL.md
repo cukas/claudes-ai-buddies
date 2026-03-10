@@ -1,95 +1,99 @@
 ---
 name: brainstorm
-description: Multi-AI roundtable — get perspectives from Claude, Codex, and Gemini on any topic
+description: Multi-AI confidence bid — each AI rates their confidence on a task, user picks who takes it
 ---
 
-# /brainstorm — Multi-AI Roundtable
+# /brainstorm — Multi-AI Confidence Bid
 
-Run a brainstorm with all available AI engines. Codex and Gemini respond in parallel, then you (Claude) synthesize all three perspectives into actionable output.
+Each available AI engine assesses a task (implementation, bug fix, refactor, etc.), gives a realistic confidence rating, and proposes their approach. The user picks who takes it.
 
 ## How to invoke
 
-The user says `/brainstorm "topic or question"`.
+The user says `/brainstorm "task description"`.
 
 ## Step-by-step workflow
 
-1. **Parse the user's prompt.** Extract the topic/question from the user's message.
-2. **Wrap the prompt with roundtable context.** Before sending to each engine, prepend this framing so they know they're in a multi-AI discussion:
+1. **Parse the task.** Extract what the user wants done from their message.
+2. **Build the assessment prompt.** Wrap the user's task with this framing for Codex and Gemini:
 
 ```
-You are participating in a multi-AI roundtable discussion alongside Claude (Anthropic) and [OTHER_ENGINE].
-Share your unique perspective on the topic below. Be direct, opinionated, and specific.
-Don't try to cover everything — focus on what you think matters most and where you might disagree with other AI perspectives.
+Assess this task honestly. You are bidding alongside other AI engines — the user will pick who handles it. Be realistic, not optimistic.
 
-Topic: USER_TOPIC_HERE
+Respond in EXACTLY this format (no other text):
+
+CONFIDENCE: [0-100]%
+APPROACH: [2-3 sentences max — what you'd do, step by step]
+RISKS: [1-2 key risks or unknowns that could trip you up]
+NEEDS: [what you'd need from the user — files, context, access, clarification]
+
+Task: USER_TASK_HERE
 ```
 
-Replace `[OTHER_ENGINE]` with the name of the other participating AI (e.g., "Gemini (Google)" when talking to Codex, "Codex (OpenAI)" when talking to Gemini).
-
-3. **Run both engines in parallel.** Use a single message with TWO Bash tool calls — one for Codex, one for Gemini. Both use `--mode exec`.
+3. **Run both engines in parallel.** Single message, two Bash calls.
 
 ```bash
 # Call 1 (parallel)
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" \
-  --prompt "WRAPPED_PROMPT" \
+  --prompt "ASSESSMENT_PROMPT" \
   --cwd "/path/to/project" \
   --mode exec
 
 # Call 2 (parallel)
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-run.sh" \
-  --prompt "WRAPPED_PROMPT" \
+  --prompt "ASSESSMENT_PROMPT" \
   --cwd "/path/to/project" \
   --mode exec
 ```
 
-3. **Read both output files** using the Read tool (parallel).
-4. **Add your own perspective.** You are not just a moderator — contribute your own analysis.
-5. **Present a structured roundtable** using the format below.
+4. **Read both output files** (parallel).
+5. **Add your own assessment.** Same format — confidence, approach, risks, needs. Be honest. If you're the best fit, say so. If not, say that too.
+6. **Present the bid table** using the format below.
 
 ## Output format
 
 ```markdown
-## Roundtable: [topic]
+## Task: [short task summary]
 
-### Codex (OpenAI)
-[Codex's response, summarized or quoted]
+| | Claude (Anthropic) | Codex (OpenAI) | Gemini (Google) |
+|---|---|---|---|
+| Confidence | X% | Y% | Z% |
+| Approach | ... | ... | ... |
+| Risks | ... | ... | ... |
+| Needs | ... | ... | ... |
 
-### Gemini (Google)
-[Gemini's response, summarized or quoted]
-
-### Claude (Anthropic)
-[Your own perspective]
-
-### Synthesis
-[Where they agree, where they diverge, and your recommended approach]
+**Recommendation:** [Who should take this and why — or "user's call" if it's close]
 ```
 
-## Options
+Keep the table cells short. If an engine gave a long response, summarize to 1-2 sentences per cell.
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--prompt` | (from user) | The brainstorm topic |
-| `--cwd` | current dir | Working directory context |
-| `--timeout` | from config (120s) | Max seconds per engine |
+## Your confidence guidelines (Claude)
+
+Be brutally honest:
+- **90-100%:** You've seen this exact pattern, know the codebase, and can do it right now
+- **70-89%:** Solid approach, but some unknowns to investigate first
+- **50-69%:** Can probably do it, but need more context or it's outside your sweet spot
+- **30-49%:** Risky — might work but significant chance of going wrong
+- **0-29%:** Not the right tool for this job — say so
+
+Do NOT inflate your confidence to "win" the bid. The user trusts honest assessments.
 
 ## Handling partial availability
 
-- If only Codex is available: run Codex + Claude (skip Gemini section)
-- If only Gemini is available: run Gemini + Claude (skip Codex section)
-- If neither is available: tell the user and give your own answer solo
-- If one engine times out: show the other's response + yours, note the timeout
+- If only one engine is available: show 2-column table (Claude + that engine)
+- If neither is available: give your solo assessment, note the others aren't available
+- If one engine times out: show its column as "TIMEOUT" and note it
 
 ## Example invocations
 
-- `/brainstorm "Best approach for real-time notifications — SSE vs WebSockets vs polling?"`
-- `/brainstorm "Should we use a monorepo or polyrepo for our microservices?"`
-- `/brainstorm "Review our authentication strategy: JWT + refresh tokens + Redis session store"`
-- `/brainstorm "Name ideas for a CLI tool that manages environment variables"`
+- `/brainstorm "Fix the race condition in the WebSocket reconnection handler"`
+- `/brainstorm "Implement OAuth2 PKCE flow for our React Native app"`
+- `/brainstorm "Refactor the payment service from callbacks to async/await"`
+- `/brainstorm "Add dark mode support to the settings page"`
 
 ## Rules
 
+- **One parallel call, one table.** No multi-round discussions. No token-burning debate.
+- **Claude is the orchestrator.** You collect, summarize, recommend — then the user decides.
+- **Realistic confidence only.** Overpromising wastes the user's time when the chosen AI fails.
 - **Never pass secrets or API keys** in the prompt.
-- **Always run both engines in parallel** — never sequentially.
-- **Contribute your own perspective** — don't just relay the other AIs' answers.
-- **Be honest about disagreements** — if you think Codex or Gemini is wrong, say so.
-- **Keep it concise** — summarize lengthy responses, don't dump walls of text.
+- **Keep it tight.** The whole output should fit on one screen.
