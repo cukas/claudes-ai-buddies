@@ -1,15 +1,6 @@
 <div align="center">
 
-```
-   _____ _                 _      _        ___  ___   ____            _     _ _
-  / ____| |               | |    ( )      / _ \|_ _| | __ ) _   _  __| | __| (_) ___  ___
- | |    | | __ _ _   _  __| | ___|/___   / /_\ \| |  |  _ \| | | |/ _` |/ _` | |/ _ \/ __|
- | |    | |/ _` | | | |/ _` |/ _ \ / __| |  _  || |  | |_) | |_| | (_| | (_| | |  __/\__ \
- | |____| | (_| | |_| | (_| |  __/ \__ \ | | | || |  |____/ \__,_|\__,_|\__,_|_|\___||___/
-  \_____|_|\__,_|\__,_|\__,_|\___| |___/ \_| |_/___|
-```
-
-**Give Claude a buddy. Or two.**
+<img src="assets/banner.svg" alt="Claude's AI Buddies" width="100%"/>
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-39%2F39-brightgreen.svg)](#testing)

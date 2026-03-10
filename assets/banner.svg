@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 320" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#161b22"/>
+    </linearGradient>
+    <linearGradient id="title" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a78bfa"/>
+      <stop offset="35%" style="stop-color:#818cf8"/>
+      <stop offset="65%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#34d399"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f472b6"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#34d399;stop-opacity:0"/>
+    </linearGradient>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="subtleglow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="320" rx="16" fill="url(#bg)"/>
+
+  <!-- Subtle border -->
+  <rect width="900" height="320" rx="16" fill="none" stroke="#30363d" stroke-width="1"/>
+
+  <!-- Decorative glow orbs -->
+  <circle cx="120" cy="80" r="120" fill="url(#glow)" opacity="0.4"/>
+  <circle cx="780" cy="240" r="100" fill="#34d399" opacity="0.05"/>
+
+  <!-- Top decorative line -->
+  <line x1="80" y1="48" x2="820" y2="48" stroke="url(#title)" stroke-width="1" opacity="0.3"/>
+
+  <!-- AI Icons row -->
+  <!-- Claude icon (left) -->
+  <g transform="translate(200, 75)">
+    <circle cx="0" cy="0" r="22" fill="#a78bfa" opacity="0.15"/>
+    <text x="0" y="7" text-anchor="middle" font-family="'Segoe UI Emoji', 'Apple Color Emoji', sans-serif" font-size="24">🤖</text>
+  </g>
+
+  <!-- Connection arrows -->
+  <g filter="url(#subtleglow)">
+    <line x1="235" y1="75" x2="310" y2="75" stroke="#818cf8" stroke-width="1.5" opacity="0.6" stroke-dasharray="6,4"/>
+    <line x1="590" y1="75" x2="665" y2="75" stroke="#60a5fa" stroke-width="1.5" opacity="0.6" stroke-dasharray="6,4"/>
+  </g>
+
+  <!-- Center handshake -->
+  <g transform="translate(450, 75)">
+    <circle cx="0" cy="0" r="28" fill="#818cf8" opacity="0.1"/>
+    <text x="0" y="8" text-anchor="middle" font-family="'Segoe UI Emoji', 'Apple Color Emoji', sans-serif" font-size="28">🤝</text>
+  </g>
+
+  <!-- Codex icon -->
+  <g transform="translate(340, 75)">
+    <rect x="-32" y="-18" width="64" height="36" rx="8" fill="#161b22" stroke="#34d399" stroke-width="1" opacity="0.8"/>
+    <text x="0" y="5" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#34d399">codex</text>
+  </g>
+
+  <!-- Gemini icon -->
+  <g transform="translate(560, 75)">
+    <rect x="-34" y="-18" width="68" height="36" rx="8" fill="#161b22" stroke="#60a5fa" stroke-width="1" opacity="0.8"/>
+    <text x="0" y="5" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#60a5fa">gemini</text>
+  </g>
+
+  <!-- More icon (right) -->
+  <g transform="translate(700, 75)">
+    <circle cx="0" cy="0" r="22" fill="#34d399" opacity="0.15"/>
+    <text x="0" y="6" text-anchor="middle" font-family="monospace" font-size="18" fill="#34d399" opacity="0.7">...</text>
+  </g>
+
+  <!-- Main title -->
+  <text x="450" y="155" text-anchor="middle" font-family="'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif" font-size="48" font-weight="800" fill="url(#title)" filter="url(#softglow)">Claude's AI Buddies</text>
+
+  <!-- Tagline -->
+  <text x="450" y="192" text-anchor="middle" font-family="'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif" font-size="18" fill="#8b949e">Give Claude a buddy. Or two.</text>
+
+  <!-- Feature pills -->
+  <g transform="translate(450, 230)">
+    <!-- Codex pill -->
+    <rect x="-310" y="-14" width="120" height="28" rx="14" fill="#34d399" opacity="0.12"/>
+    <text x="-250" y="5" text-anchor="middle" font-family="monospace" font-size="12" font-weight="600" fill="#34d399">/codex</text>
+
+    <!-- Gemini pill -->
+    <rect x="-170" y="-14" width="130" height="28" rx="14" fill="#60a5fa" opacity="0.12"/>
+    <text x="-105" y="5" text-anchor="middle" font-family="monospace" font-size="12" font-weight="600" fill="#60a5fa">/gemini</text>
+
+    <!-- Review pill -->
+    <rect x="-20" y="-14" width="160" height="28" rx="14" fill="#a78bfa" opacity="0.12"/>
+    <text x="60" y="5" text-anchor="middle" font-family="monospace" font-size="12" font-weight="600" fill="#a78bfa">/codex-review</text>
+
+    <!-- Gemini Review pill -->
+    <rect x="160" y="-14" width="170" height="28" rx="14" fill="#f472b6" opacity="0.12"/>
+    <text x="245" y="5" text-anchor="middle" font-family="monospace" font-size="12" font-weight="600" fill="#f472b6">/gemini-review</text>
+  </g>
+
+  <!-- Bottom info -->
+  <text x="450" y="280" text-anchor="middle" font-family="'SF Pro Text', 'Inter', system-ui, sans-serif" font-size="13" fill="#484f58">No MCP  ·  Direct CLI  ·  Stateless  ·  Timeout-safe</text>
+
+  <!-- Bottom decorative line -->
+  <line x1="80" y1="300" x2="820" y2="300" stroke="url(#title)" stroke-width="1" opacity="0.2"/>
+</svg>
