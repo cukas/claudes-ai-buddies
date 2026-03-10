@@ -48,10 +48,10 @@ Recommendation: Claude — highest confidence, already knows the codebase
 ```
 
 **Why this works:**
-- ~400 tokens total — cheaper than Claude reasoning through it alone
-- Three different training sets catch blind spots the others miss
-- Disagreements are the most valuable signal — when one AI says 40% and the others say 80%, that's worth investigating
-- Zero wasted compute — only the winner does the actual work
+- **~400 tokens total** — cheaper than Claude reasoning through it alone. The scoping that would cost Claude thousands of tokens gets split across three cheap parallel calls
+- **Claude calibrates the bids** — each engine has a different confidence scale. Claude reads the actual approaches, adjusts inflated or deflated scores, and gives you a calibrated recommendation. "Codex says 80% but the approach skips error handling — realistic ~60%"
+- **Three training sets catch blind spots** — each model has weaknesses the others don't. The disagreements are the most valuable signal
+- **Zero wasted compute** — only the winner does the actual work
 
 ---
 

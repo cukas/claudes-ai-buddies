@@ -66,6 +66,18 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-run.sh" \
 
 Keep the table cells short. If an engine gave a long response, summarize to 1-2 sentences per cell.
 
+## Calibration — your most important job
+
+Each engine has a different confidence calibration. An 80% from Codex and 80% from Gemini don't mean the same thing. You are the calibrator:
+
+- **Read the approach, not just the number.** If an engine says 85% but the approach is vague or hand-wavy, adjust down.
+- **Check risks vs confidence.** If an engine lists serious risks but still claims high confidence, that's inflated — call it out.
+- **Show both raw and calibrated.** In the table, show what each engine reported. In the recommendation, explain your adjusted read.
+- **Flag overconfidence explicitly.** "Codex says 80% but their approach skips error handling — realistic confidence ~60%."
+- **Flag underconfidence too.** If an engine is conservative but has a solid approach, say so.
+
+The recommendation must reflect your calibrated assessment, not raw numbers.
+
 ## Your confidence guidelines (Claude)
 
 Be brutally honest:
