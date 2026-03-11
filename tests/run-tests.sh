@@ -226,6 +226,9 @@ assert_contains "$output" "/gemini"
 test_start "session-start.sh mentions /brainstorm skill"
 assert_contains "$output" "/brainstorm"
 
+test_start "session-start.sh mentions /forge skill"
+assert_contains "$output" "/forge"
+
 # ── codex-run.sh tests ──────────────────────────────────────────────────────
 echo ""
 echo "--- codex-run.sh ---"
@@ -353,6 +356,19 @@ assert_file_exists "${PLUGIN_ROOT}/scripts/codex-run.sh"
 test_start "gemini-run.sh exists"
 assert_file_exists "${PLUGIN_ROOT}/scripts/gemini-run.sh"
 
+test_start "forge SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/forge/SKILL.md"
+
+test_start "forge-fitness.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/forge-fitness.sh"
+
+test_start "forge-fitness.sh is executable"
+if [[ -x "${PLUGIN_ROOT}/scripts/forge-fitness.sh" ]]; then
+  test_pass
+else
+  test_fail "forge-fitness.sh is not executable"
+fi
+
 test_start "plugin.json is valid JSON"
 if jq . "${PLUGIN_ROOT}/.claude-plugin/plugin.json" &>/dev/null; then
   test_pass
@@ -366,6 +382,93 @@ if jq . "${PLUGIN_ROOT}/hooks/hooks.json" &>/dev/null; then
 else
   test_fail "invalid JSON"
 fi
+
+# ── forge-fitness.sh tests ────────────────────────────────────────────────────
+echo ""
+echo "--- forge-fitness.sh ---"
+
+test_start "forge-fitness.sh requires --dir"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-fitness.sh" --cmd "true" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "forge-fitness.sh requires --cmd"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-fitness.sh" --dir /tmp 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+# Create a temp git repo for fitness tests
+FITNESS_REPO=$(mktemp -d)
+cd "$FITNESS_REPO"
+git init -q
+echo "hello" > file.txt
+git add file.txt
+git commit -q -m "init"
+
+test_start "forge-fitness.sh passing test produces JSON"
+echo "modified" > file.txt
+result_path=$(bash "${PLUGIN_ROOT}/scripts/forge-fitness.sh" \
+  --dir "$FITNESS_REPO" --cmd "true" --label test-pass 2>&1 | tail -1)
+if [[ -f "$result_path" ]] && jq . "$result_path" &>/dev/null; then
+  test_pass
+else
+  test_fail "no valid JSON at: $result_path"
+fi
+
+test_start "forge-fitness.sh passing test has pass=true"
+pass_val=$(jq -r '.pass' "$result_path" 2>/dev/null)
+assert_eq "$pass_val" "true"
+
+test_start "forge-fitness.sh passing test has timed_out=false"
+timeout_val=$(jq -r '.timed_out' "$result_path" 2>/dev/null)
+assert_eq "$timeout_val" "false"
+
+test_start "forge-fitness.sh failing test has pass=false"
+git checkout -- file.txt 2>/dev/null || true
+echo "changed again" > file.txt
+result_path=$(bash "${PLUGIN_ROOT}/scripts/forge-fitness.sh" \
+  --dir "$FITNESS_REPO" --cmd "exit 1" --label test-fail 2>&1 | tail -1)
+pass_val=$(jq -r '.pass' "$result_path" 2>/dev/null)
+assert_eq "$pass_val" "false"
+
+test_start "forge-fitness.sh counts modified files"
+git checkout -- file.txt 2>/dev/null || true
+git reset HEAD 2>/dev/null || true
+echo "tracked change" > file.txt
+result_path=$(bash "${PLUGIN_ROOT}/scripts/forge-fitness.sh" \
+  --dir "$FITNESS_REPO" --cmd "true" --label test-count 2>&1 | tail -1)
+files_val=$(jq -r '.files_changed' "$result_path" 2>/dev/null)
+if [[ "$files_val" -ge 1 ]]; then
+  test_pass
+else
+  test_fail "expected >= 1 files_changed, got $files_val"
+fi
+
+test_start "forge-fitness.sh detects new (untracked) files"
+git checkout -- file.txt 2>/dev/null || true
+git reset HEAD 2>/dev/null || true
+echo "brand new" > newfile.txt
+result_path=$(bash "${PLUGIN_ROOT}/scripts/forge-fitness.sh" \
+  --dir "$FITNESS_REPO" --cmd "true" --label test-new 2>&1 | tail -1)
+files_val=$(jq -r '.files_changed' "$result_path" 2>/dev/null)
+if [[ "$files_val" -ge 1 ]]; then
+  test_pass
+else
+  test_fail "expected >= 1 for new file, got $files_val"
+fi
+
+test_start "forge-fitness.sh includes diff_lines in output"
+diff_val=$(jq -r '.diff_lines' "$result_path" 2>/dev/null)
+if [[ "$diff_val" -ge 1 ]]; then
+  test_pass
+else
+  test_fail "expected >= 1 diff_lines, got $diff_val"
+fi
+
+test_start "forge-fitness.sh label is preserved in JSON"
+label_val=$(jq -r '.label' "$result_path" 2>/dev/null)
+assert_eq "$label_val" "test-new"
+
+cd "$PLUGIN_ROOT"
+rm -rf "$FITNESS_REPO"
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 rm -rf "$MOCK_DIR" "$TEST_HOME"
