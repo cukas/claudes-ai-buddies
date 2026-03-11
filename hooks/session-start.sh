@@ -49,9 +49,9 @@ if [[ -n "$gemini_bin" ]]; then
   [[ -n "$skills" ]] && skills="${skills}, "
   skills="${skills}/gemini, /gemini-review"
 fi
-# Brainstorm requires at least one engine
+# Brainstorm and forge require at least one engine (forge also works solo but shines with peers)
 if [[ -n "$codex_bin" ]] || [[ -n "$gemini_bin" ]]; then
-  skills="${skills}, /brainstorm"
+  skills="${skills}, /brainstorm, /forge"
 fi
 
 engine_list=$(printf '%s' "${engines[*]}" | sed 's/ /; /2')
