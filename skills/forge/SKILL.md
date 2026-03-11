@@ -14,44 +14,45 @@ Three AI engines independently implement the same task, compete on automated fit
 /forge "Add NaN guard to scoring" --fitness "npx jest"
 ```
 
-**Plan-then-forge** — user describes a larger feature, Claude plans it:
-```
-/forge plan "Add retry logic to the sidecar connection" --fitness "npx jest"
-```
-
 Optional: `--timeout SECS` to override the safety cap (default: 600s). Engines self-exit when done — the timeout is just a safety net, not a target.
 
-## Plan-then-forge mode
+## Using forge inside existing planning workflows
 
-When the user says `/forge plan "feature"` or asks to "plan it and forge the critical parts":
+`/forge` works as a **tool within any plan** — `/build-guard`, `/plan-guarded`, plan mode, or any task list. It is NOT a separate planning system.
 
-1. **Claude plans the feature** — break it into discrete tasks. For each task, tag it:
-   - `[forge]` — algorithmic, tricky, multiple valid approaches, benefits from competition
-   - `[direct]` — straightforward wiring, config, boilerplate — Claude handles alone
+### The `[forge]` tag
 
-2. **Present the plan** to the user. Example:
-   ```
-   ## Plan: Add retry logic to sidecar connection
+When building a plan (in any workflow), Claude can tag tasks:
+- `[forge]` — algorithmic, tricky, multiple valid approaches → three-way competition
+- No tag or `[direct]` — straightforward → Claude handles normally
 
-   1. [direct]  Add RetryConfig type to shared types
-   2. [forge]   Implement exponential backoff with jitter algorithm
-   3. [direct]  Wire retry config into python-manager.ts
-   4. [forge]   Add circuit breaker pattern for repeated failures
-   5. [direct]  Add retry status to UI connection indicator
-   ```
+Example plan (from `/build-guard`, plan mode, or anywhere):
+```
+1. Add RetryConfig type to shared types
+2. [forge] Implement exponential backoff with jitter algorithm
+3. Wire retry config into python-manager.ts
+4. [forge] Add circuit breaker pattern for repeated failures
+5. Add retry status to UI connection indicator
+```
 
-3. **User approves** (or adjusts which tasks get forged).
+### During execution
 
-4. **Execute sequentially:**
-   - `[direct]` tasks: Claude implements normally
-   - `[forge]` tasks: run the full forge workflow (diverge → fitness → scoreboard → converge)
-   - After each forge, apply the winner before moving to the next task
+When Claude reaches a `[forge]` task, it runs the full forge workflow below (setup → diverge → fitness → scoreboard → converge), then continues with the next task in the plan.
 
-5. **Between tasks**, commit the working state so each forge starts from a clean base.
+**Between forge tasks**, commit the working state so each forge starts from a clean base.
 
-**What to forge:** Algorithms, scoring logic, data transformations, race condition fixes, performance-critical code, anything where "three minds > one."
+### What to tag `[forge]`
 
-**What NOT to forge:** Types, imports, config, UI layout, wiring, glue code — things with one obvious answer.
+- Algorithms, scoring logic, data transformations
+- Race condition fixes, concurrency patterns
+- Performance-critical code paths
+- Anything with multiple valid approaches where three perspectives help
+
+### What NOT to tag `[forge]`
+
+- Types, imports, config, UI layout, wiring
+- Boilerplate, glue code — one obvious answer
+- Anything without a runnable fitness test
 
 ---
 
