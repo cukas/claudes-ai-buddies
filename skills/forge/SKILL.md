@@ -11,11 +11,13 @@ Three AI engines independently implement the same task, compete on automated fit
 
 The user says `/forge "task description" --fitness "test command"`.
 
+Optional: `--timeout SECS` to override engine time limit (default: 300s). For complex tasks, use `--timeout 600`.
+
 ## Step-by-step workflow
 
 ### Phase 0: Setup
 
-1. **Parse args.** Extract the task and `--fitness` command. If no `--fitness`, ask the user.
+1. **Parse args.** Extract the task, `--fitness` command, and optional `--timeout` (default 300s). If no `--fitness`, ask the user.
 2. **Detect engines.** Source lib.sh and check binaries:
 
 ```bash
@@ -49,7 +51,7 @@ Then **send available peer engines in parallel** (one Bash call per engine, sing
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/{codex,gemini}-run.sh" \
   --prompt "IMPLEMENT_PROMPT" \
   --cwd "$FORGE_DIR/wt-{engine}" \
-  --mode exec --timeout 180
+  --mode exec --timeout $FORGE_TIMEOUT
 ```
 
 **Implementation prompt** (replace TASK and FITNESS):
@@ -63,7 +65,8 @@ FITNESS TEST: {fitness command}
 RULES:
 - Write the actual code — do not plan or ask questions.
 - Modify only files necessary. Follow existing conventions.
-- Make it pass the fitness test. Be thorough but minimal.
+- After implementing, RUN the fitness test yourself. If it fails, fix and retry until it passes.
+- Be thorough but minimal. Fewest lines changed wins ties.
 ```
 
 **After each engine finishes**, read the output file. If it starts with `TIMEOUT:` or `ERROR:`, mark that engine accordingly in the scoreboard and continue.
@@ -146,6 +149,6 @@ rm -rf "$FORGE_DIR"
 - **Require `--fitness`.** No automated scoring = no forge.
 - **Never touch user's working tree** until Phase 5 with explicit approval.
 - **Always clean up** worktrees, even on error.
-- **Time budget:** 180s implementation, 120s fitness per engine. Two rounds max.
+- **Time budget:** Default 300s per engine (user can override with `--timeout`). 120s for fitness. Two rounds max.
 - **Check engine output** for `TIMEOUT:`/`ERROR:` markers before proceeding.
 - **Stage before diffing:** `git add -A` then `git diff --cached` to capture new files.
