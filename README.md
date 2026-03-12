@@ -55,7 +55,7 @@ Winner: Gemini — score 89/100.
 
 **How it works:**
 
-1. **Context** — reads your CLAUDE.md/README, recent commits, and detects language/conventions. Injected into every engine's prompt
+1. **Context** — detects languages, conventions (ESLint, Ruff, etc.), and candidate files from the task description. Lightweight and task-scoped — no bloated project dumps
 2. **Stage 1: Starter** — one engine runs first. If it scores >= 88 with clean lint and style, it's auto-accepted. No need to burn tokens on challengers
 3. **Stage 2: Challengers** — if the starter doesn't clear the bar, remaining engines run in parallel. All scored with composite fitness
 4. **Stage 3: Synthesis** — on close calls (spread < 8 points), losers send targeted critique hunks. The winner refines selectively. Only kept if the score improves
