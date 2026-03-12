@@ -3,7 +3,7 @@
 <img src="assets/banner.svg" alt="Claude's AI Buddies" width="100%"/>
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-58%2F58-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-105%2F105-brightgreen.svg)](#-testing)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-blueviolet.svg)](https://github.com/cukas/claude-plugins)
 
 *Three AI engines. One codebase. They compete, you ship.*
@@ -29,7 +29,7 @@ What if three AI engines could compete on the same coding task — and only the 
 
 ## Forge — the flagship feature (v2.0)
 
-Three AI engines independently implement the same task in isolated git worktrees. Automated fitness tests score each solution. The best one wins.
+Three AI engines independently implement the same task in isolated git worktrees. Automated fitness tests and composite quality scoring determine the winner.
 
 ```
 /forge "Add input validation to math utils" --fitness "node src/math.test.js"
@@ -41,24 +41,34 @@ Three AI engines independently implement the same task in isolated git worktrees
 | | Claude | Codex | Gemini |
 |---|---|---|---|
 | Fitness | FAIL | PASS | PASS |
+| Score | 0/100 | 82/100 | 89/100 |
 | Duration | 4s | 12s | 8s |
 | Files changed | 1 | 1 | 1 |
 | Diff size | 33 lines | 41 lines | 27 lines |
+| Lint warnings | 2 | 0 | 0 |
+| Style score | 85/100 | 95/100 | 100/100 |
 
-Winner: Gemini — passed fitness with smallest diff.
+Winner: Gemini — score 89/100.
 ```
 
 **How it works:**
 
-1. **Diverge** — each engine implements the task in its own git worktree. They self-test and iterate using their own internal loops (Claude's subagents, Codex's `--full-auto`, Gemini's `--yolo`)
-2. **Crucible** — `forge-fitness.sh` runs your test suite against all solutions. JSON scores: pass/fail, duration, files changed, diff size
-3. **Scoreboard** — results presented side by side. Objective winner based on fitness + simplicity
-4. **Cross-pollinate** *(optional)* — each engine sees all three solutions and refines the winner. Second generation inherits the best ideas from all three
-5. **Converge** — you approve the winning diff before it touches your working tree
+1. **Context** — `ai_buddies_project_context()` reads your CLAUDE.md/README, recent commits, and detects language/conventions. Injected into every engine's prompt
+2. **Diverge** — each engine implements the task in its own git worktree. They self-test and iterate using their own internal loops (Claude's subagents, Codex's `--full-auto`, Gemini's `--yolo`)
+3. **Crucible** — `forge-fitness.sh` runs your test suite. `forge-score.sh` runs available linters and style checks. Composite score: diff size 30%, lint 15%, style 15%, files 10%, duration 5%, test pass 25%
+4. **Scoreboard** — results with composite scores. Close calls (within 5 points) are flagged
+5. **Cross-pollinate** *(optional)* — each engine sees all three solutions and refines the winner
+6. **Converge** — you approve the winning diff before it touches your working tree
+
+**New in v2.0:**
+- **`--async`** — run peer engines in background, continue your conversation
+- **Speculative tests** — omit `--fitness` and engines propose test suites. You pick the best, then forge proceeds
+- **Composite scoring** — linters (ESLint, Ruff, ShellCheck, Clippy) + style checks + diff analysis = objective 0-100 score
+- **Project context** — engines see your conventions, commit style, and project description
 
 **Why this works:**
 - **Three different training sets** = three different approaches to the same problem. Blind spots cancel out
-- **Fitness tests, not vibes** — automated scoring means the best code wins, not the most confident pitch
+- **Fitness tests, not vibes** — automated composite scoring means the best code wins, not the most confident pitch
 - **Engines self-correct** — each gets up to 600s to implement, test, fix, and iterate. No artificial time pressure
 - **Graceful degradation** — works with 3, 2, or 1 engine. Timeouts and errors don't block the forge
 
@@ -258,7 +268,7 @@ bash tests/run-tests.sh
 ```
 === claudes-ai-buddies test suite ===
   ...
-=== Results: 58/58 passed, 0 failed ===
+=== Results: 105/105 passed, 0 failed ===
 ```
 
 ---

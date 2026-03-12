@@ -1,7 +1,7 @@
 {
   "name": "claudes-ai-buddies",
   "description": "Use peer AI CLIs (Codex, Gemini) from Claude Code — brainstorm, delegate, review",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": { "name": "cukas" },
   "homepage": "https://github.com/cukas/claudes-ai-buddies",
   "repository": "https://github.com/cukas/claudes-ai-buddies",

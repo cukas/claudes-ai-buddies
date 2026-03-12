@@ -490,6 +490,416 @@ assert_eq "$label_val" "test-new"
 cd "$PLUGIN_ROOT"
 rm -rf "$FITNESS_REPO"
 
+# ── ai_buddies_project_context tests (F4) ────────────────────────────────────
+echo ""
+echo "--- ai_buddies_project_context (F4) ---"
+
+# Node project
+CTX_NODE_DIR=$(mktemp -d)
+cd "$CTX_NODE_DIR"
+git init -q
+echo '{"scripts":{"test":"jest"}}' > package.json
+echo "# My App" > README.md
+echo "init" > f.txt && git add -A && git commit -q -m "init"
+
+test_start "project_context detects Node/JS language"
+result=$(ai_buddies_project_context "$CTX_NODE_DIR")
+assert_contains "$result" "JavaScript"
+
+test_start "project_context includes README content"
+assert_contains "$result" "My App"
+
+test_start "project_context includes recent commits"
+assert_contains "$result" "init"
+
+test_start "project_context detects test convention"
+assert_contains "$result" "jest"
+
+cd "$PLUGIN_ROOT"
+rm -rf "$CTX_NODE_DIR"
+
+# Python project
+CTX_PY_DIR=$(mktemp -d)
+cd "$CTX_PY_DIR"
+git init -q
+echo '[project]' > pyproject.toml
+echo "init" > f.txt && git add -A && git commit -q -m "init"
+
+test_start "project_context detects Python language"
+result=$(ai_buddies_project_context "$CTX_PY_DIR")
+assert_contains "$result" "Python"
+
+cd "$PLUGIN_ROOT"
+rm -rf "$CTX_PY_DIR"
+
+# Empty project (no manifest)
+CTX_EMPTY_DIR=$(mktemp -d)
+cd "$CTX_EMPTY_DIR"
+git init -q
+echo "hi" > f.txt && git add -A && git commit -q -m "init"
+
+test_start "project_context works with empty project"
+result=$(ai_buddies_project_context "$CTX_EMPTY_DIR")
+# Should not fail, may return commits only
+assert_contains "$result" "init"
+
+cd "$PLUGIN_ROOT"
+rm -rf "$CTX_EMPTY_DIR"
+
+# Disabled via config
+test_start "project_context respects config=false"
+ai_buddies_config_set "context_summary" "false"
+result=$(ai_buddies_project_context "/tmp")
+assert_eq "$result" ""
+ai_buddies_config_set "context_summary" "true"
+
+# ── ai_buddies_compute_forge_score tests (F5) ────────────────────────────────
+echo ""
+echo "--- ai_buddies_compute_forge_score (F5) ---"
+
+test_start "score: fail always returns 0"
+result=$(ai_buddies_compute_forge_score "false" 10 1 5 0 100)
+assert_eq "$result" "0"
+
+test_start "score: perfect pass returns high score"
+result=$(ai_buddies_compute_forge_score "true" 0 1 0 0 100)
+if [[ "$result" -ge 90 ]]; then
+  test_pass
+else
+  test_fail "expected >= 90, got $result"
+fi
+
+test_start "score: more diff lines = lower score"
+score_small=$(ai_buddies_compute_forge_score "true" 10 1 5 0 100)
+score_big=$(ai_buddies_compute_forge_score "true" 200 1 5 0 100)
+if [[ "$score_small" -gt "$score_big" ]]; then
+  test_pass
+else
+  test_fail "expected small diff ($score_small) > big diff ($score_big)"
+fi
+
+test_start "score: lint warnings reduce score"
+score_clean=$(ai_buddies_compute_forge_score "true" 10 1 5 0 100)
+score_dirty=$(ai_buddies_compute_forge_score "true" 10 1 5 10 100)
+if [[ "$score_clean" -gt "$score_dirty" ]]; then
+  test_pass
+else
+  test_fail "expected clean ($score_clean) > dirty ($score_dirty)"
+fi
+
+test_start "score: low style reduces score"
+score_styled=$(ai_buddies_compute_forge_score "true" 10 1 5 0 100)
+score_ugly=$(ai_buddies_compute_forge_score "true" 10 1 5 0 20)
+if [[ "$score_styled" -gt "$score_ugly" ]]; then
+  test_pass
+else
+  test_fail "expected styled ($score_styled) > ugly ($score_ugly)"
+fi
+
+test_start "score: more files = lower score"
+score_one=$(ai_buddies_compute_forge_score "true" 10 1 5 0 100)
+score_many=$(ai_buddies_compute_forge_score "true" 10 8 5 0 100)
+if [[ "$score_one" -gt "$score_many" ]]; then
+  test_pass
+else
+  test_fail "expected 1 file ($score_one) > 8 files ($score_many)"
+fi
+
+# ── ai_buddies_forge_timeout tests ───────────────────────────────────────────
+echo ""
+echo "--- ai_buddies_forge_timeout ---"
+
+test_start "forge_timeout returns default 600"
+result=$(ai_buddies_forge_timeout)
+assert_eq "$result" "600"
+
+test_start "forge_timeout reads config override"
+ai_buddies_config_set "forge_timeout" "300"
+result=$(ai_buddies_forge_timeout)
+assert_eq "$result" "300"
+ai_buddies_config_set "forge_timeout" ""
+
+# ── ai_buddies_build_forge_prompt tests ──────────────────────────────────────
+echo ""
+echo "--- ai_buddies_build_forge_prompt ---"
+
+test_start "build_forge_prompt includes task"
+result=$(ai_buddies_build_forge_prompt "fix the bug" "npm test" "")
+assert_contains "$result" "fix the bug"
+
+test_start "build_forge_prompt includes fitness"
+assert_contains "$result" "npm test"
+
+test_start "build_forge_prompt includes context when provided"
+result=$(ai_buddies_build_forge_prompt "task" "cmd" "LANGUAGES: Python")
+assert_contains "$result" "Python"
+
+test_start "build_forge_prompt includes rules"
+result=$(ai_buddies_build_forge_prompt "task" "cmd" "")
+assert_contains "$result" "RULES"
+
+# ── ai_buddies_build_spectest_prompt tests ───────────────────────────────────
+echo ""
+echo "--- ai_buddies_build_spectest_prompt ---"
+
+test_start "build_spectest_prompt includes task"
+result=$(ai_buddies_build_spectest_prompt "add validation" "")
+assert_contains "$result" "add validation"
+
+test_start "build_spectest_prompt includes RUN_CMD instruction"
+assert_contains "$result" "RUN_CMD"
+
+# ── ai_buddies_forge_status tests ────────────────────────────────────────────
+echo ""
+echo "--- ai_buddies_forge_status ---"
+
+test_start "forge_status returns pending when no manifest"
+STATUS_DIR=$(mktemp -d)
+result=$(ai_buddies_forge_status "$STATUS_DIR")
+assert_eq "$result" "pending"
+
+test_start "forge_status parses manifest"
+echo '{"winner":"codex","engines":["claude","codex","gemini"]}' > "${STATUS_DIR}/manifest.json"
+result=$(ai_buddies_forge_status "$STATUS_DIR")
+assert_contains "$result" "codex"
+rm -rf "$STATUS_DIR"
+
+# ── ai_buddies_forge_manifest tests ──────────────────────────────────────────
+echo ""
+echo "--- ai_buddies_forge_manifest ---"
+
+test_start "forge_manifest writes valid JSON"
+MANIFEST_DIR=$(mktemp -d)
+MANIFEST_FILE="${MANIFEST_DIR}/manifest.json"
+ai_buddies_forge_manifest "$MANIFEST_FILE" "test-123" "/tmp/forge" "fix bug" "claude,codex" '{"claude":{"pass":true,"score":80},"codex":{"pass":true,"score":90}}' '{"claude":"/tmp/c.diff","codex":"/tmp/x.diff"}' "codex"
+if jq . "$MANIFEST_FILE" &>/dev/null; then
+  test_pass
+else
+  test_fail "invalid JSON"
+fi
+
+test_start "forge_manifest has correct winner"
+winner=$(jq -r '.winner' "$MANIFEST_FILE")
+assert_eq "$winner" "codex"
+
+test_start "forge_manifest has correct engines"
+engine_count=$(jq '.engines | length' "$MANIFEST_FILE")
+assert_eq "$engine_count" "2"
+
+rm -rf "$MANIFEST_DIR"
+
+# ── forge-score.sh tests ─────────────────────────────────────────────────────
+echo ""
+echo "--- forge-score.sh ---"
+
+test_start "forge-score.sh requires --dir"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-score.sh" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+SCORE_REPO=$(mktemp -d)
+cd "$SCORE_REPO"
+git init -q
+echo "hello" > file.sh
+git add -A && git commit -q -m "init"
+echo "modified  " > file.sh  # trailing whitespace
+git add -A
+
+test_start "forge-score.sh outputs valid JSON"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-score.sh" --dir "$SCORE_REPO" --label test-score 2>&1)
+if echo "$output" | jq . &>/dev/null; then
+  test_pass
+else
+  test_fail "invalid JSON: $output"
+fi
+
+test_start "forge-score.sh detects style issues"
+style_score=$(echo "$output" | jq -r '.style_score' 2>/dev/null)
+if [[ "$style_score" -lt 100 ]]; then
+  test_pass
+else
+  test_fail "expected style_score < 100, got $style_score"
+fi
+
+test_start "forge-score.sh preserves label"
+label=$(echo "$output" | jq -r '.label' 2>/dev/null)
+assert_eq "$label" "test-score"
+
+cd "$PLUGIN_ROOT"
+rm -rf "$SCORE_REPO"
+
+# ── forge-run.sh tests ──────────────────────────────────────────────────────
+echo ""
+echo "--- forge-run.sh ---"
+
+test_start "forge-run.sh requires --forge-dir"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-run.sh" --task "x" --fitness "true" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "forge-run.sh requires --task"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-run.sh" --forge-dir /tmp --fitness "true" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "forge-run.sh requires --fitness"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-run.sh" --forge-dir /tmp --task "x" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+# Full forge-run test with mock engines
+RUN_REPO=$(mktemp -d)
+cd "$RUN_REPO"
+git init -q
+echo "base" > code.txt
+git add -A && git commit -q -m "init"
+RUN_FORGE_DIR=$(mktemp -d)
+git worktree add --detach "${RUN_FORGE_DIR}/wt-claude" HEAD 2>/dev/null
+echo "claude-impl" > "${RUN_FORGE_DIR}/wt-claude/code.txt"
+
+test_start "forge-run.sh produces manifest.json"
+manifest_path=$(bash "${PLUGIN_ROOT}/scripts/forge-run.sh" \
+  --forge-dir "$RUN_FORGE_DIR" \
+  --task "test task" \
+  --fitness "true" \
+  --timeout 30 2>&1 | tail -1)
+if [[ -f "$manifest_path" ]] && jq . "$manifest_path" &>/dev/null; then
+  test_pass
+else
+  test_fail "no valid manifest at: $manifest_path"
+fi
+
+test_start "forge-run.sh manifest has winner"
+if [[ -f "$manifest_path" ]]; then
+  winner=$(jq -r '.winner' "$manifest_path" 2>/dev/null)
+  if [[ -n "$winner" && "$winner" != "null" && "$winner" != "none" ]]; then
+    test_pass
+  else
+    test_fail "winner is empty/null: $winner"
+  fi
+else
+  test_fail "no manifest"
+fi
+
+test_start "forge-run.sh manifest has engines array"
+if [[ -f "$manifest_path" ]]; then
+  count=$(jq '.engines | length' "$manifest_path" 2>/dev/null)
+  if [[ "$count" -ge 1 ]]; then
+    test_pass
+  else
+    test_fail "expected >= 1 engine, got $count"
+  fi
+else
+  test_fail "no manifest"
+fi
+
+# Clean up worktrees
+git -C "$RUN_REPO" worktree remove "${RUN_FORGE_DIR}/wt-claude" --force 2>/dev/null || true
+for e in codex gemini; do
+  [[ -d "${RUN_FORGE_DIR}/wt-${e}" ]] && git -C "$RUN_REPO" worktree remove "${RUN_FORGE_DIR}/wt-${e}" --force 2>/dev/null || true
+done
+cd "$PLUGIN_ROOT"
+rm -rf "$RUN_REPO" "$RUN_FORGE_DIR"
+
+# ── forge-spectest.sh tests ──────────────────────────────────────────────────
+echo ""
+echo "--- forge-spectest.sh ---"
+
+test_start "forge-spectest.sh requires --task"
+output=$(bash "${PLUGIN_ROOT}/scripts/forge-spectest.sh" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+SPEC_REPO=$(mktemp -d)
+cd "$SPEC_REPO"
+git init -q
+echo "base" > code.txt
+git add -A && git commit -q -m "init"
+
+test_start "forge-spectest.sh produces proposals file"
+result_path=$(bash "${PLUGIN_ROOT}/scripts/forge-spectest.sh" \
+  --task "add validation" --cwd "$SPEC_REPO" --timeout 30 2>&1 | tail -1)
+if [[ -f "$result_path" ]] && jq . "$result_path" &>/dev/null; then
+  test_pass
+else
+  test_fail "no valid proposals at: $result_path"
+fi
+
+test_start "forge-spectest.sh proposals contain task"
+if [[ -f "$result_path" ]]; then
+  task=$(jq -r '.task' "$result_path" 2>/dev/null)
+  assert_contains "$task" "validation"
+else
+  test_fail "no proposals file"
+fi
+
+cd "$PLUGIN_ROOT"
+rm -rf "$SPEC_REPO"
+
+# ── forge-fitness.sh composite score tests ───────────────────────────────────
+echo ""
+echo "--- forge-fitness.sh (composite score) ---"
+
+FITNESS2_REPO=$(mktemp -d)
+cd "$FITNESS2_REPO"
+git init -q
+echo "hello" > file.txt
+git add file.txt && git commit -q -m "init"
+echo "modified" > file.txt
+
+test_start "forge-fitness.sh includes composite_score field"
+result_path=$(bash "${PLUGIN_ROOT}/scripts/forge-fitness.sh" \
+  --dir "$FITNESS2_REPO" --cmd "true" --label test-composite 2>&1 | tail -1)
+if [[ -f "$result_path" ]]; then
+  composite=$(jq -r '.composite_score' "$result_path" 2>/dev/null)
+  if [[ -n "$composite" && "$composite" != "null" ]]; then
+    test_pass
+  else
+    test_fail "no composite_score field"
+  fi
+else
+  test_fail "no result file"
+fi
+
+test_start "forge-fitness.sh composite_score is numeric"
+if [[ "$composite" =~ ^[0-9]+$ ]]; then
+  test_pass
+else
+  test_fail "expected numeric, got $composite"
+fi
+
+cd "$PLUGIN_ROOT"
+rm -rf "$FITNESS2_REPO"
+
+# ── File structure tests (new scripts) ───────────────────────────────────────
+echo ""
+echo "--- file structure (v2.1) ---"
+
+test_start "forge-run.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/forge-run.sh"
+
+test_start "forge-run.sh is executable"
+if [[ -x "${PLUGIN_ROOT}/scripts/forge-run.sh" ]]; then
+  test_pass
+else
+  test_fail "forge-run.sh is not executable"
+fi
+
+test_start "forge-score.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/forge-score.sh"
+
+test_start "forge-score.sh is executable"
+if [[ -x "${PLUGIN_ROOT}/scripts/forge-score.sh" ]]; then
+  test_pass
+else
+  test_fail "forge-score.sh is not executable"
+fi
+
+test_start "forge-spectest.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/forge-spectest.sh"
+
+test_start "forge-spectest.sh is executable"
+if [[ -x "${PLUGIN_ROOT}/scripts/forge-spectest.sh" ]]; then
+  test_pass
+else
+  test_fail "forge-spectest.sh is not executable"
+fi
+
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 rm -rf "$MOCK_DIR" "$TEST_HOME"
 

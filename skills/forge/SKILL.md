@@ -14,7 +14,9 @@ Three AI engines independently implement the same task, compete on automated fit
 /forge "Add NaN guard to scoring" --fitness "npx jest"
 ```
 
-Optional: `--timeout SECS` to override the safety cap (default: 600s). Engines self-exit when done — the timeout is just a safety net, not a target.
+Optional flags:
+- `--timeout SECS` — override the safety cap (default: 600s from config key `forge_timeout`)
+- `--async` — run peer engines in background, continue conversation
 
 ## Using forge inside existing planning workflows
 
@@ -60,16 +62,17 @@ When Claude reaches a `[forge]` task, it runs the full forge workflow below (set
 
 ### Phase 0: Setup
 
-1. **Parse args.** Extract the task, `--fitness` command, and optional `--timeout` (default 600s). If no `--fitness`, ask the user.
+1. **Parse args.** Extract the task, `--fitness` command, optional `--timeout`, and `--async` flag.
 2. **Detect engines.** Source lib.sh and check binaries:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"
 CODEX_BIN=$(ai_buddies_find_codex 2>/dev/null) || CODEX_BIN=""
 GEMINI_BIN=$(ai_buddies_find_gemini 2>/dev/null) || GEMINI_BIN=""
+FORGE_TIMEOUT=$(ai_buddies_forge_timeout)  # config key, default 600
 ```
 
-3. **Create forge directory and detached worktrees** (one per available engine):
+3. **Create forge directory and claude worktree:**
 
 ```bash
 FORGE_ID="$(date +%s)-${RANDOM}"
@@ -78,58 +81,84 @@ mkdir -p "$FORGE_DIR"
 
 ENGINES=(claude)
 git worktree add --detach "$FORGE_DIR/wt-claude" HEAD
-[[ -n "$CODEX_BIN" ]]  && ENGINES+=(codex)  && git worktree add --detach "$FORGE_DIR/wt-codex" HEAD
-[[ -n "$GEMINI_BIN" ]] && ENGINES+=(gemini) && git worktree add --detach "$FORGE_DIR/wt-gemini" HEAD
+[[ -n "$CODEX_BIN" ]]  && ENGINES+=(codex)
+[[ -n "$GEMINI_BIN" ]] && ENGINES+=(gemini)
 ```
 
 4. **Tell the user** how many engines are competing, the task, and what fitness will run.
 
-### Phase 1: Diverge (parallel implementation)
+### Phase 0.5: Speculative Test Generation (if no `--fitness`)
+
+When `--fitness` is omitted, run the spectest pre-phase before proceeding:
+
+```bash
+SPECTEST_RESULT=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-spectest.sh" \
+  --task "$TASK" --cwd "$(pwd)" --timeout "$FORGE_TIMEOUT")
+```
+
+Read the proposals JSON. Each engine proposes test files and a run command. Claude reviews all proposals, picks or synthesizes the best fitness test, then presents it to the user for approval. Once approved, set `--fitness` to the chosen run command and proceed with the normal forge.
+
+If running non-interactively (e.g., inside `--async` or automated pipeline), Claude picks the proposal with the broadest test coverage and proceeds automatically without user approval.
+
+### Phase 1: Diverge (Claude implements)
 
 **Claude implements first** in `$FORGE_DIR/wt-claude/` using Edit/Write tools with absolute paths.
 
-Then **send available peer engines in parallel** (one Bash call per engine, single message):
+### Phase 1.5: Dispatch peers via forge-run.sh
 
+After Claude's implementation is complete, launch peer engines:
+
+**Synchronous (default):**
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/{codex,gemini}-run.sh" \
-  --prompt "IMPLEMENT_PROMPT" \
-  --cwd "$FORGE_DIR/wt-{engine}" \
-  --mode exec --timeout $FORGE_TIMEOUT  # default 600s — engines self-exit when done
+MANIFEST_PATH=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-run.sh" \
+  --forge-dir "$FORGE_DIR" \
+  --task "$TASK" \
+  --fitness "$FITNESS_CMD" \
+  --timeout "$FORGE_TIMEOUT")
 ```
 
-**Implementation prompt** (replace TASK and FITNESS):
-
-```
-You are competing in a code forge against other AI engines. Implement this task so it passes the fitness test. Best implementation wins.
-
-TASK: {task description}
-FITNESS TEST: {fitness command}
-
-RULES:
-- Write the actual code — do not plan or ask questions.
-- Modify only files necessary. Follow existing conventions.
-- After implementing, RUN the fitness test yourself. If it fails, fix and retry until it passes.
-- Exit when you're confident the fitness test passes. Take the time you need.
-- Be thorough but minimal. Fewest lines changed wins ties.
-```
-
-**After each engine finishes**, read the output file. If it starts with `TIMEOUT:` or `ERROR:`, mark that engine accordingly in the scoreboard and continue.
-
-### Phase 2: Crucible (fitness testing)
-
-**Stage, diff, and score each engine** — run fitness calls in parallel (single message):
-
+**Async (when `--async` flag is set):**
 ```bash
-for engine in "${ENGINES[@]}"; do
-  wt="$FORGE_DIR/wt-$engine"
-  (cd "$wt" && git add -A && git diff --cached > "$FORGE_DIR/$engine-patch.diff")
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-run.sh" \
+  --forge-dir "$FORGE_DIR" \
+  --task "$TASK" \
+  --fitness "$FITNESS_CMD" \
+  --timeout "$FORGE_TIMEOUT"
+```
+Run the above via Bash tool with `run_in_background: true`. Tell user "Forge running in background, I'll show results when done." On completion notification, read `$FORGE_DIR/manifest.json` and proceed to Phase 2.
 
-  bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-fitness.sh" \
-    --dir "$wt" --cmd "FITNESS_CMD" --label "$engine" --timeout 120
-done
+Check status while waiting (optional):
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"
+ai_buddies_forge_status "$FORGE_DIR"  # "pending" | "done: winner=codex, engines=3"
 ```
 
-Read JSON results. Each contains: `pass`, `timed_out`, `exit_code`, `duration_sec`, `files_changed`, `diff_lines`.
+### Phase 2: Read Results
+
+Read `$FORGE_DIR/manifest.json`. It contains:
+
+```json
+{
+  "forge_id": "...",
+  "forge_dir": "...",
+  "engines": ["claude","codex","gemini"],
+  "task": "...",
+  "results": {
+    "<engine>": {
+      "pass": true,
+      "score": 85,
+      "diff_lines": 27,
+      "files_changed": 1,
+      "duration_sec": 12,
+      "lint_warnings": 0,
+      "style_score": 95
+    }
+  },
+  "patches": { "<engine>": "path/to/patch.diff" },
+  "winner": "codex",
+  "close_call": false
+}
+```
 
 ### Phase 3: Scoreboard
 
@@ -141,14 +170,19 @@ Present to user — columns for available engines only:
 | | Engine 1 | Engine 2 | Engine 3 |
 |---|---|---|---|
 | Fitness | PASS/FAIL/TIMEOUT | ... | ... |
+| Score | 85/100 | ... | ... |
 | Duration | Xs | ... | ... |
 | Files changed | N | ... | ... |
 | Diff size | N lines | ... | ... |
+| Lint warnings | N | ... | ... |
+| Style score | N/100 | ... | ... |
 
-**Winner:** [engine] — reason.
+**Winner:** [engine] — score X/100.
 ```
 
-Winner: passed fitness with fewest changes. If none passed, report failures and ask user.
+If `close_call` is true, note: "Close call (within 5 points) — consider reviewing both approaches."
+
+Winner: highest composite score (pass required). If none passed, report failures and ask user.
 
 ### Phase 4: Cross-pollinate (optional)
 
@@ -161,7 +195,7 @@ Three implementations with fitness results:
 Improve the winner by taking the best from all three. Make it pass: {fitness command}.
 ```
 
-Claude refines its worktree. Send peers in parallel. Run fitness again.
+Claude refines its worktree. Send peers in parallel via a second `forge-run.sh` call. Run fitness again.
 
 ### Phase 5: Converge
 
@@ -190,9 +224,10 @@ rm -rf "$FORGE_DIR"
 
 ## Rules
 
-- **Require `--fitness`.** No automated scoring = no forge.
+- **Require `--fitness`** (or run spectest pre-phase to generate one).
 - **Never touch user's working tree** until Phase 5 with explicit approval.
 - **Always clean up** worktrees, even on error.
-- **Time budget:** Default 600s safety cap per engine (user can override with `--timeout`). Engines self-exit when done. 120s for fitness. Two rounds max.
+- **Time budget:** Default from `ai_buddies_forge_timeout()` config (600s). Engines self-exit when done. 120s for fitness. Two rounds max.
 - **Check engine output** for `TIMEOUT:`/`ERROR:` markers before proceeding.
 - **Stage before diffing:** `git add -A` then `git diff --cached` to capture new files.
+- **Prompts from lib.sh:** Use `ai_buddies_build_forge_prompt()` — never inline prompt text.

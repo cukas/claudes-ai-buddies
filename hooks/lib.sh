@@ -220,11 +220,13 @@ ai_buddies_run_with_timeout() {
     timeout "${timeout_secs}s" "$@"
   else
     # Perl-based fallback for macOS without coreutils
+    # Uses process group kill (-$$) to reap child trees, not just the direct child
     perl -e '
+      use POSIX qw(setpgid);
       alarm shift @ARGV;
-      $SIG{ALRM} = sub { kill 9, $pid; exit 124 };
       $pid = fork;
-      if ($pid == 0) { exec @ARGV; die "exec failed: $!" }
+      if ($pid == 0) { setpgid(0,0); exec @ARGV; die "exec failed: $!" }
+      $SIG{ALRM} = sub { kill -9, $pid; exit 124 };
       waitpid $pid, 0;
       exit ($? >> 8);
     ' "$timeout_secs" "$@"
@@ -272,6 +274,252 @@ ${diff_content}
 
 ${prompt}
 EOF
+}
+
+# ── Project context summary (F4) ─────────────────────────────────────────────
+# Reads project info from CWD: CLAUDE.md/README, recent commits, language, conventions.
+# Returns formatted block, max 3000 chars. Config key: context_summary (default true).
+ai_buddies_project_context() {
+  local cwd="${1:-$(pwd)}"
+  local enabled
+  enabled="$(ai_buddies_config "context_summary" "true")"
+  [[ "$enabled" != "true" ]] && return 0
+
+  local ctx=""
+  local max_chars=3000
+
+  # 1. Project description from CLAUDE.md or README.md (first 100 lines, cap 2000 chars)
+  local desc_file=""
+  for candidate in CLAUDE.md .claude/CLAUDE.md README.md readme.md; do
+    if [[ -f "${cwd}/${candidate}" ]]; then
+      desc_file="${cwd}/${candidate}"
+      break
+    fi
+  done
+  if [[ -n "$desc_file" ]]; then
+    local desc
+    desc=$(head -100 "$desc_file" | head -c 2000)
+    ctx+="PROJECT DESCRIPTION (from $(basename "$desc_file")):"$'\n'"${desc}"$'\n\n'
+  fi
+
+  # 2. Recent commits for style reference
+  local commits
+  commits=$(cd "$cwd" && git log --oneline -10 2>/dev/null || echo "")
+  if [[ -n "$commits" ]]; then
+    ctx+="RECENT COMMITS:"$'\n'"${commits}"$'\n\n'
+  fi
+
+  # 3. Detect language from manifest files
+  local langs=""
+  [[ -f "${cwd}/package.json" ]]     && langs+="JavaScript/TypeScript, "
+  [[ -f "${cwd}/pyproject.toml" || -f "${cwd}/setup.py" || -f "${cwd}/requirements.txt" ]] && langs+="Python, "
+  [[ -f "${cwd}/Cargo.toml" ]]       && langs+="Rust, "
+  [[ -f "${cwd}/go.mod" ]]           && langs+="Go, "
+  [[ -f "${cwd}/Gemfile" ]]          && langs+="Ruby, "
+  [[ -f "${cwd}/pom.xml" || -f "${cwd}/build.gradle" ]] && langs+="Java, "
+  langs="${langs%, }"
+  if [[ -n "$langs" ]]; then
+    ctx+="LANGUAGES: ${langs}"$'\n'
+  fi
+
+  # 4. Conventions (test framework, linting, formatting)
+  local conventions=""
+  if [[ -f "${cwd}/package.json" ]]; then
+    command -v jq &>/dev/null && {
+      local test_cmd
+      test_cmd=$(jq -r '.scripts.test // empty' "${cwd}/package.json" 2>/dev/null)
+      [[ -n "$test_cmd" ]] && conventions+="Test: ${test_cmd}, "
+    }
+  fi
+  [[ -f "${cwd}/.eslintrc" || -f "${cwd}/.eslintrc.json" || -f "${cwd}/.eslintrc.js" || -f "${cwd}/eslint.config.js" ]] && conventions+="ESLint, "
+  [[ -f "${cwd}/.prettierrc" || -f "${cwd}/.prettierrc.json" ]] && conventions+="Prettier, "
+  [[ -f "${cwd}/pyproject.toml" ]] && grep -q "ruff" "${cwd}/pyproject.toml" 2>/dev/null && conventions+="Ruff, "
+  [[ -f "${cwd}/.shellcheckrc" ]] && conventions+="ShellCheck, "
+  [[ -f "${cwd}/rustfmt.toml" || -f "${cwd}/.rustfmt.toml" ]] && conventions+="rustfmt, "
+  conventions="${conventions%, }"
+  if [[ -n "$conventions" ]]; then
+    ctx+="CONVENTIONS: ${conventions}"$'\n'
+  fi
+
+  # Cap total output
+  if [[ ${#ctx} -gt $max_chars ]]; then
+    ctx="${ctx:0:$max_chars}..."
+  fi
+
+  printf '%s' "$ctx"
+}
+
+# ── Forge timeout (F1) ──────────────────────────────────────────────────────
+# Reads forge_timeout config key, default 600. Used by forge-run.sh and SKILL.md.
+ai_buddies_forge_timeout() {
+  ai_buddies_config "forge_timeout" "600"
+}
+
+# ── Build forge prompt (F1) ─────────────────────────────────────────────────
+# Constructs engine prompt from task + fitness + context. Single source of truth.
+# Usage: ai_buddies_build_forge_prompt "task" "fitness_cmd" "context_text"
+ai_buddies_build_forge_prompt() {
+  local task="$1"
+  local fitness="$2"
+  local context="${3:-}"
+
+  local prompt="You are competing in a code forge against other AI engines. Implement this task so it passes the fitness test. Best implementation wins."
+  prompt+=$'\n\n'"TASK: ${task}"
+  prompt+=$'\n'"FITNESS TEST: ${fitness}"
+
+  if [[ -n "$context" ]]; then
+    prompt+=$'\n\n'"PROJECT CONTEXT:"$'\n'"${context}"
+  fi
+
+  prompt+=$'\n\n'"RULES:"
+  prompt+=$'\n'"- Write the actual code — do not plan or ask questions."
+  prompt+=$'\n'"- Modify only files necessary. Follow existing conventions."
+  prompt+=$'\n'"- After implementing, RUN the fitness test yourself. If it fails, fix and retry until it passes."
+  prompt+=$'\n'"- Exit when you'\''re confident the fitness test passes. Take the time you need."
+  prompt+=$'\n'"- Be thorough but minimal. Fewest lines changed wins ties."
+
+  printf '%s' "$prompt"
+}
+
+# ── Build spectest prompt (F3) ──────────────────────────────────────────────
+# Constructs prompt for speculative test generation.
+# Usage: ai_buddies_build_spectest_prompt "task" "context_text"
+ai_buddies_build_spectest_prompt() {
+  local task="$1"
+  local context="${2:-}"
+
+  local prompt="Propose fitness tests for this task. Write test files and a run command that will PASS only when the task is correctly implemented and FAIL otherwise."
+  prompt+=$'\n\n'"TASK: ${task}"
+
+  if [[ -n "$context" ]]; then
+    prompt+=$'\n\n'"PROJECT CONTEXT:"$'\n'"${context}"
+  fi
+
+  prompt+=$'\n\n'"RULES:"
+  prompt+=$'\n'"- Write actual test files — executable, not pseudocode."
+  prompt+=$'\n'"- Tests must be runnable with a single command."
+  prompt+=$'\n'"- Tests should fail right now (task not yet implemented) and pass after correct implementation."
+  prompt+=$'\n'"- Keep tests focused and minimal. Test behavior, not implementation details."
+  prompt+=$'\n'"- Output the run command as the last line of your response, prefixed with RUN_CMD:"
+
+  printf '%s' "$prompt"
+}
+
+# ── Forge manifest writer (F1) ──────────────────────────────────────────────
+# Writes manifest.json from arguments. Reused by forge-run.sh and forge-spectest.sh.
+# Usage: ai_buddies_forge_manifest MANIFEST_FILE FORGE_ID FORGE_DIR TASK ENGINES_CSV RESULTS_JSON PATCHES_JSON WINNER
+ai_buddies_forge_manifest() {
+  local manifest_file="$1"
+  local forge_id="$2"
+  local forge_dir="$3"
+  local task="$4"
+  local engines_csv="$5"   # "claude,codex,gemini"
+  local results_json="$6"  # '{"claude":{"pass":true,...},...}'
+  local patches_json="$7"  # '{"claude":"path/to/patch",...}'
+  local winner="$8"
+
+  if command -v jq &>/dev/null; then
+    jq -n \
+      --arg fid "$forge_id" \
+      --arg fdir "$forge_dir" \
+      --arg task "$task" \
+      --arg engines "$engines_csv" \
+      --argjson results "$results_json" \
+      --argjson patches "$patches_json" \
+      --arg winner "$winner" \
+      '{
+        forge_id: $fid,
+        forge_dir: $fdir,
+        engines: ($engines | split(",")),
+        task: $task,
+        results: $results,
+        patches: $patches,
+        winner: $winner
+      }' > "$manifest_file"
+  else
+    ai_buddies_debug "forge-manifest: jq not available, writing minimal JSON"
+    cat > "$manifest_file" <<EOF
+{"forge_id":"${forge_id}","forge_dir":"${forge_dir}","task":$(ai_buddies_escape_json "$task"),"winner":"${winner}"}
+EOF
+  fi
+
+  ai_buddies_debug "forge-manifest: wrote ${manifest_file}"
+}
+
+# ── Forge status (F2) ───────────────────────────────────────────────────────
+# Reads manifest.json, returns one-line summary.
+# Usage: ai_buddies_forge_status FORGE_DIR
+ai_buddies_forge_status() {
+  local forge_dir="$1"
+  local manifest="${forge_dir}/manifest.json"
+
+  if [[ ! -f "$manifest" ]]; then
+    echo "pending"
+    return 0
+  fi
+
+  if command -v jq &>/dev/null; then
+    local winner engines_count
+    winner=$(jq -r '.winner // "none"' "$manifest" 2>/dev/null)
+    engines_count=$(jq -r '.engines | length' "$manifest" 2>/dev/null)
+    echo "done: winner=${winner}, engines=${engines_count}"
+  else
+    echo "done: manifest exists"
+  fi
+}
+
+# ── Compute forge composite score (F5) ──────────────────────────────────────
+# Composite 0-100: diff_size 30%, lint 15%, style 15%, files 10%, test_output 10%, duration 5%, shellcheck 15%.
+# Pass is a hard filter (score=0 if fail). Scores within 5pts flagged as "close".
+# Usage: ai_buddies_compute_forge_score PASS DIFF_LINES FILES_CHANGED DURATION LINT_WARNINGS STYLE_SCORE
+# Outputs: composite score (integer 0-100)
+ai_buddies_compute_forge_score() {
+  local pass="$1"
+  # Sanitize inputs: strip non-numeric chars, default to 0/100. Protects against
+  # jq returning floats ("12.5"), empty strings, or "null".
+  local diff_lines="${2:-0}";       diff_lines="${diff_lines%%.*}";    diff_lines="${diff_lines//[!0-9]/}"; diff_lines="${diff_lines:-0}"
+  local files_changed="${3:-0}";    files_changed="${files_changed%%.*}"; files_changed="${files_changed//[!0-9]/}"; files_changed="${files_changed:-0}"
+  local duration="${4:-0}";         duration="${duration%%.*}";        duration="${duration//[!0-9]/}"; duration="${duration:-0}"
+  local lint_warnings="${5:-0}";    lint_warnings="${lint_warnings%%.*}"; lint_warnings="${lint_warnings//[!0-9]/}"; lint_warnings="${lint_warnings:-0}"
+  local style_score="${6:-100}";    style_score="${style_score%%.*}";  style_score="${style_score//[!0-9]/}"; style_score="${style_score:-100}"
+
+  # Hard filter: fail = 0
+  [[ "$pass" != "true" ]] && echo "0" && return 0
+
+  # Diff size score (30%): fewer lines = better. 0 lines=100, 500+=0
+  local diff_score=100
+  if (( diff_lines > 0 )); then
+    diff_score=$(( 100 - (diff_lines * 100 / 500) ))
+    (( diff_score < 0 )) && diff_score=0 || true
+  fi
+
+  # Lint score (15%): 0 warnings=100, 20+=0
+  local lint_score=100
+  if (( lint_warnings > 0 )); then
+    lint_score=$(( 100 - (lint_warnings * 5) ))
+    (( lint_score < 0 )) && lint_score=0 || true
+  fi
+
+  # Files score (10%): fewer files = better. 1=100, 10+=0
+  local files_score=100
+  if (( files_changed > 1 )); then
+    files_score=$(( 100 - ((files_changed - 1) * 11) ))
+    (( files_score < 0 )) && files_score=0 || true
+  fi
+
+  # Duration score (5%): faster = better. 0-10s=100, 600s+=0
+  local dur_score=100
+  if (( duration > 10 )); then
+    dur_score=$(( 100 - ((duration - 10) * 100 / 590) ))
+    (( dur_score < 0 )) && dur_score=0 || true
+  fi
+
+  # Composite: diff 30%, lint 15%, style 15%, files 10%, duration 5%, reserve 25% (test pass)
+  # Since pass is a hard filter, the 25% reserve is always 100 when we get here
+  local composite=$(( (diff_score * 30 + lint_score * 15 + style_score * 15 + files_score * 10 + dur_score * 5 + 100 * 25) / 100 ))
+  (( composite > 100 )) && composite=100 || true
+
+  echo "$composite"
 }
 
 # ── JSON escape ──────────────────────────────────────────────────────────────
