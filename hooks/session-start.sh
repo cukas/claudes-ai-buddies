@@ -13,6 +13,14 @@ ai_buddies_debug "session-start fired (event: ${CLAUDE_HOOK_EVENT:-unknown})"
 # ── Detect available engines ─────────────────────────────────────────────────
 engines=()
 
+claude_engine_bin="$(ai_buddies_find_claude 2>/dev/null)" || claude_engine_bin=""
+if [[ -n "$claude_engine_bin" ]]; then
+  claude_engine_version=$("$claude_engine_bin" --version 2>/dev/null | head -1 || echo "unknown")
+  claude_engine_model=$(ai_buddies_claude_model)
+  [[ -z "$claude_engine_model" ]] && claude_engine_model="default"
+  engines+=("Claude-engine ${claude_engine_version} (${claude_engine_model})")
+fi
+
 codex_bin="$(ai_buddies_find_codex 2>/dev/null)" || codex_bin=""
 if [[ -n "$codex_bin" ]]; then
   codex_version=$("$codex_bin" --version 2>/dev/null | head -1 || echo "unknown")
@@ -49,9 +57,13 @@ if [[ -n "$gemini_bin" ]]; then
   [[ -n "$skills" ]] && skills="${skills}, "
   skills="${skills}/gemini, /gemini-review"
 fi
-# Brainstorm requires at least one engine
+# Brainstorm requires at least one peer engine
 if [[ -n "$codex_bin" ]] || [[ -n "$gemini_bin" ]]; then
   skills="${skills}, /brainstorm"
+fi
+# Forge works with any engine (claude-engine, codex, or gemini) — at least 1 needed
+if [[ -n "$claude_engine_bin" ]] || [[ -n "$codex_bin" ]] || [[ -n "$gemini_bin" ]]; then
+  skills="${skills}, /forge"
 fi
 
 engine_list=$(printf '%s' "${engines[*]}" | sed 's/ /; /2')

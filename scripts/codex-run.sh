@@ -57,91 +57,28 @@ OUTPUT_FILE="${SESSION_DIR}/codex-output-${TIMESTAMP}.md"
 ERROR_FILE="${SESSION_DIR}/codex-error-${TIMESTAMP}.log"
 
 # ── Build the prompt ─────────────────────────────────────────────────────────
-build_review_prompt() {
-  local diff_content=""
-  local target="$1"
-
-  case "$target" in
-    uncommitted)
-      diff_content=$(cd "$CWD" && git diff HEAD 2>/dev/null || git diff 2>/dev/null || echo "(no diff available)")
-      ;;
-    branch:*)
-      local branch="${target#branch:}"
-      diff_content=$(cd "$CWD" && git diff "${branch}...HEAD" 2>/dev/null || echo "(no diff for branch ${branch})")
-      ;;
-    commit:*)
-      local sha="${target#commit:}"
-      diff_content=$(cd "$CWD" && git show "$sha" 2>/dev/null || echo "(no diff for commit ${sha})")
-      ;;
-    *)
-      diff_content=$(cd "$CWD" && git diff HEAD 2>/dev/null || echo "(no diff available)")
-      ;;
-  esac
-
-  cat <<EOF
-You are reviewing code changes. Provide a thorough code review covering:
-- Bugs and logic errors
-- Security vulnerabilities
-- Performance issues
-- Code quality and readability
-- Suggestions for improvement
-
-Here are the changes to review:
-
-\`\`\`diff
-${diff_content}
-\`\`\`
-
-${PROMPT}
-EOF
-}
-
 FINAL_PROMPT="$PROMPT"
 if [[ "$MODE" == "review" ]]; then
-  FINAL_PROMPT="$(build_review_prompt "$REVIEW_TARGET")"
+  FINAL_PROMPT="$(ai_buddies_build_review_prompt "$PROMPT" "$CWD" "$REVIEW_TARGET")"
 fi
 
 # ── Run codex ────────────────────────────────────────────────────────────────
 ai_buddies_debug "codex-run: executing codex exec"
 
-# Build command array
 CODEX_ARGS=(
   exec
   --ephemeral
   "--${SANDBOX}"
 )
-# Only pass --model if explicitly set (otherwise codex uses its own default)
 [[ -n "$MODEL" ]] && CODEX_ARGS+=(--model "$MODEL")
 CODEX_ARGS+=(
   -o "$OUTPUT_FILE"
   "$FINAL_PROMPT"
 )
 
-# macOS timeout: use gtimeout (coreutils) or perl fallback
-run_with_timeout() {
-  local timeout_secs="$1"
-  shift
-
-  if command -v gtimeout &>/dev/null; then
-    gtimeout "${timeout_secs}s" "$@"
-  elif command -v timeout &>/dev/null; then
-    timeout "${timeout_secs}s" "$@"
-  else
-    # Perl-based fallback for macOS without coreutils
-    perl -e '
-      alarm shift @ARGV;
-      $SIG{ALRM} = sub { kill 9, $pid; exit 124 };
-      $pid = fork;
-      if ($pid == 0) { exec @ARGV; die "exec failed: $!" }
-      waitpid $pid, 0;
-      exit ($? >> 8);
-    ' "$timeout_secs" "$@"
-  fi
-}
-
 EXIT_CODE=0
 cd "$CWD"
-run_with_timeout "$TIMEOUT" "$CODEX_BIN" "${CODEX_ARGS[@]}" 2>"$ERROR_FILE" || EXIT_CODE=$?
+ai_buddies_run_with_timeout "$TIMEOUT" "$CODEX_BIN" "${CODEX_ARGS[@]}" 2>"$ERROR_FILE" || EXIT_CODE=$?
 
 # ── Handle result ────────────────────────────────────────────────────────────
 if [[ $EXIT_CODE -eq 124 ]]; then

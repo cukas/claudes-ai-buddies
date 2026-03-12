@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# claudes-ai-buddies — core wrapper for gemini CLI
-# Usage: gemini-run.sh --prompt "..." [--cwd DIR] [--mode exec|review]
+# claudes-ai-buddies — core wrapper for claude CLI (Claude Code)
+# Usage: claude-run.sh --prompt "..." [--cwd DIR] [--mode exec|review]
 #        [--review-target uncommitted|branch:NAME|commit:SHA]
-#        [--timeout SECS] [--model MODEL] [--sandbox MODE]
+#        [--timeout SECS] [--model MODEL]
 
 set -euo pipefail
 
@@ -17,8 +17,7 @@ CWD="$(pwd)"
 MODE="exec"
 REVIEW_TARGET="uncommitted"
 TIMEOUT="$(ai_buddies_timeout)"
-MODEL="$(ai_buddies_gemini_model)"
-SANDBOX="$(ai_buddies_sandbox)"
+MODEL="$(ai_buddies_claude_model)"
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -29,7 +28,6 @@ while [[ $# -gt 0 ]]; do
     --review-target) REVIEW_TARGET="$2"; shift 2 ;;
     --timeout)    TIMEOUT="$2";       shift 2 ;;
     --model)      MODEL="$2";         shift 2 ;;
-    --sandbox)    SANDBOX="$2";       shift 2 ;;
     *)
       echo "ERROR: Unknown argument: $1" >&2
       exit 1
@@ -42,19 +40,19 @@ if [[ -z "$PROMPT" ]]; then
   exit 1
 fi
 
-# ── Find gemini ──────────────────────────────────────────────────────────────
-GEMINI_BIN="$(ai_buddies_find_gemini 2>/dev/null)" || {
-  echo "ERROR: gemini CLI not found. Install: npm install -g @google/gemini-cli" >&2
+# ── Find claude ──────────────────────────────────────────────────────────────
+CLAUDE_BIN="$(ai_buddies_find_claude 2>/dev/null)" || {
+  echo "ERROR: claude CLI not found. Install: npm install -g @anthropic-ai/claude-code" >&2
   exit 1
 }
 
-ai_buddies_debug "gemini-run: mode=$MODE, model=$MODEL, timeout=$TIMEOUT, cwd=$CWD"
+ai_buddies_debug "claude-run: mode=$MODE, model=$MODEL, timeout=$TIMEOUT, cwd=$CWD"
 
 # ── Prepare output ───────────────────────────────────────────────────────────
 SESSION_DIR="$(ai_buddies_session_dir)"
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
-OUTPUT_FILE="${SESSION_DIR}/gemini-output-${TIMESTAMP}.md"
-ERROR_FILE="${SESSION_DIR}/gemini-error-${TIMESTAMP}.log"
+OUTPUT_FILE="${SESSION_DIR}/claude-output-${TIMESTAMP}.md"
+ERROR_FILE="${SESSION_DIR}/claude-error-${TIMESTAMP}.log"
 
 # ── Build the prompt ─────────────────────────────────────────────────────────
 FINAL_PROMPT="$PROMPT"
@@ -62,47 +60,45 @@ if [[ "$MODE" == "review" ]]; then
   FINAL_PROMPT="$(ai_buddies_build_review_prompt "$PROMPT" "$CWD" "$REVIEW_TARGET")"
 fi
 
-# ── Map sandbox to gemini CLI flags ──────────────────────────────────────────
-GEMINI_SANDBOX_ARGS=()
-case "$SANDBOX" in
-  full-auto) GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode yolo) ;;
-  suggest)   GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode default) ;;
-  *)         GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode yolo) ;;
-esac
+# ── Run claude ───────────────────────────────────────────────────────────────
+ai_buddies_debug "claude-run: executing claude --print -p"
 
-# ── Run gemini ───────────────────────────────────────────────────────────────
-ai_buddies_debug "gemini-run: executing gemini -p"
-
-GEMINI_ARGS=(-p "$FINAL_PROMPT")
-[[ -n "$MODEL" ]] && GEMINI_ARGS+=(--model "$MODEL")
+CLAUDE_ARGS=(
+  --print
+  -p "$FINAL_PROMPT"
+  --allowedTools "Edit,Write,Read,Bash,Glob,Grep"
+  --max-turns 50
+)
+[[ -n "$MODEL" ]] && CLAUDE_ARGS+=(--model "$MODEL")
 
 EXIT_CODE=0
 cd "$CWD"
-ai_buddies_run_with_timeout "$TIMEOUT" "$GEMINI_BIN" \
-  "${GEMINI_ARGS[@]}" \
-  "${GEMINI_SANDBOX_ARGS[@]}" \
+# Unset CLAUDECODE so the subprocess doesn't think it's nested inside a parent session
+unset CLAUDECODE 2>/dev/null || true
+ai_buddies_run_with_timeout "$TIMEOUT" "$CLAUDE_BIN" \
+  "${CLAUDE_ARGS[@]}" \
   > "$OUTPUT_FILE" 2>"$ERROR_FILE" || EXIT_CODE=$?
 
 # ── Handle result ────────────────────────────────────────────────────────────
 if [[ $EXIT_CODE -eq 124 ]]; then
-  echo "TIMEOUT: Gemini did not respond within ${TIMEOUT}s" > "$OUTPUT_FILE"
-  ai_buddies_debug "gemini-run: timed out after ${TIMEOUT}s"
+  echo "TIMEOUT: Claude did not respond within ${TIMEOUT}s" > "$OUTPUT_FILE"
+  ai_buddies_debug "claude-run: timed out after ${TIMEOUT}s"
 elif [[ $EXIT_CODE -ne 0 ]]; then
   {
-    echo "ERROR: Gemini exited with code ${EXIT_CODE}"
+    echo "ERROR: Claude exited with code ${EXIT_CODE}"
     echo ""
     echo "--- stderr ---"
     cat "$ERROR_FILE" 2>/dev/null || echo "(no stderr captured)"
   } > "$OUTPUT_FILE"
-  ai_buddies_debug "gemini-run: failed with exit code ${EXIT_CODE}"
+  ai_buddies_debug "claude-run: failed with exit code ${EXIT_CODE}"
 fi
 
-# ── Output the file path for Claude to read ──────────────────────────────────
+# ── Output the file path for orchestrator to read ────────────────────────────
 if [[ -f "$OUTPUT_FILE" ]]; then
   echo "$OUTPUT_FILE"
-  ai_buddies_debug "gemini-run: output at ${OUTPUT_FILE}"
+  ai_buddies_debug "claude-run: output at ${OUTPUT_FILE}"
 else
   echo "ERROR: No output file generated" >&2
-  ai_buddies_debug "gemini-run: no output file"
+  ai_buddies_debug "claude-run: no output file"
   exit 1
 fi
