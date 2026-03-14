@@ -45,7 +45,6 @@ MANIFEST_PATH=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/tribunal-run.sh" \
   --question "THE_QUESTION" \
   --cwd "$(pwd)" \
   --rounds 2 \
-  --buddies 2 \
   --timeout 600)
 ```
 

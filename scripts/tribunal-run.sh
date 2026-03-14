@@ -66,9 +66,21 @@ if [[ ${#ALL_AVAILABLE[@]} -lt 2 ]]; then
   exit 1
 fi
 
-# Take top N buddies
+# Shuffle available buddies so selection isn't always alphabetical.
+# Uses seconds-based rotation: rotate the array by (epoch % length) positions.
+SHUFFLED=()
+if [[ ${#ALL_AVAILABLE[@]} -gt 0 ]]; then
+  local_len=${#ALL_AVAILABLE[@]}
+  rotation=$(( $(date +%s) % local_len ))
+  for (( i=0; i<local_len; i++ )); do
+    idx=$(( (i + rotation) % local_len ))
+    SHUFFLED+=("${ALL_AVAILABLE[$idx]}")
+  done
+fi
+
+# Take top N buddies from shuffled list
 DEBATERS=()
-for id in "${ALL_AVAILABLE[@]}"; do
+for id in "${SHUFFLED[@]}"; do
   DEBATERS+=("$id")
   (( ${#DEBATERS[@]} >= MAX_BUDDIES )) && break
 done
