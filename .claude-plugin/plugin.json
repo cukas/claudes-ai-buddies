@@ -1,10 +1,10 @@
 {
   "name": "claudes-ai-buddies",
-  "description": "Use peer AI CLIs (Codex, Gemini) from Claude Code — brainstorm, delegate, review",
-  "version": "2.0.0",
+  "description": "Dynamic multi-AI buddy system — forge, tribunal, ELO leaderboard, any CLI",
+  "version": "3.0.0",
   "author": { "name": "cukas" },
   "homepage": "https://github.com/cukas/claudes-ai-buddies",
   "repository": "https://github.com/cukas/claudes-ai-buddies",
   "license": "MIT",
-  "keywords": ["codex", "gemini", "openai", "peer-ai", "code-review", "brainstorm"]
+  "keywords": ["codex", "gemini", "openai", "peer-ai", "code-review", "brainstorm", "forge", "tribunal", "elo"]
 }

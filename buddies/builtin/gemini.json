@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "gemini",
+  "display_name": "Gemini (Google)",
+  "binary": "gemini",
+  "search_paths": [
+    "${HOME}/.nvm/versions/node/*/bin/gemini",
+    "${HOME}/.local/bin/gemini",
+    "/usr/local/bin/gemini"
+  ],
+  "version_cmd": ["--version"],
+  "model_config_key": "gemini_model",
+  "modes": ["exec", "review"],
+  "is_local": false,
+  "builtin": true,
+  "adapter_script": "gemini-run.sh",
+  "install_hint": "npm install -g @google/gemini-cli",
+  "timeout": 120
+}

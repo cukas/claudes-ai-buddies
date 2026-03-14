@@ -100,35 +100,9 @@ for engine in "${LOSERS[@]}"; do
   [[ -d "$wt" ]] || continue
   CRITIQUE_ENGINES+=("$engine")
 
-  case "$engine" in
-    claude)
-      bash "${PLUGIN_ROOT}/scripts/claude-run.sh" \
-        --prompt "$CRITIQUE_PROMPT" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$SYNTHESIS_TIMEOUT" \
-        > "${FORGE_DIR}/${engine}-critique-output.txt" 2>&1 &
-      CRITIQUE_PIDS+=($!); _SYNTH_PIDS+=($!)
-      ;;
-    codex)
-      bash "${PLUGIN_ROOT}/scripts/codex-run.sh" \
-        --prompt "$CRITIQUE_PROMPT" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$SYNTHESIS_TIMEOUT" \
-        > "${FORGE_DIR}/${engine}-critique-output.txt" 2>&1 &
-      CRITIQUE_PIDS+=($!); _SYNTH_PIDS+=($!)
-      ;;
-    gemini)
-      bash "${PLUGIN_ROOT}/scripts/gemini-run.sh" \
-        --prompt "$CRITIQUE_PROMPT" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$SYNTHESIS_TIMEOUT" \
-        > "${FORGE_DIR}/${engine}-critique-output.txt" 2>&1 &
-      CRITIQUE_PIDS+=($!); _SYNTH_PIDS+=($!)
-      ;;
-  esac
+  ai_buddies_dispatch_buddy "$engine" "$wt" "$CRITIQUE_PROMPT" "$SYNTHESIS_TIMEOUT" "$FORGE_DIR" "$PLUGIN_ROOT" \
+    > "${FORGE_DIR}/${engine}-critique-output.txt" 2>&1 &
+  CRITIQUE_PIDS+=($!); _SYNTH_PIDS+=($!)
 done
 
 for pid in "${CRITIQUE_PIDS[@]}"; do
@@ -198,32 +172,8 @@ SYNTH_PROMPT=$(ai_buddies_build_synthesis_prompt "$WINNER_DIFF" "$ALL_CRITIQUES"
 
 ai_buddies_debug "forge-synthesize: dispatching refinement to $WINNER"
 
-case "$WINNER" in
-  claude)
-    bash "${PLUGIN_ROOT}/scripts/claude-run.sh" \
-      --prompt "$SYNTH_PROMPT" \
-      --cwd "$SYNTH_WT" \
-      --mode exec \
-      --timeout "$SYNTHESIS_TIMEOUT" \
-      > "${FORGE_DIR}/synth-output.txt" 2>&1
-    ;;
-  codex)
-    bash "${PLUGIN_ROOT}/scripts/codex-run.sh" \
-      --prompt "$SYNTH_PROMPT" \
-      --cwd "$SYNTH_WT" \
-      --mode exec \
-      --timeout "$SYNTHESIS_TIMEOUT" \
-      > "${FORGE_DIR}/synth-output.txt" 2>&1
-    ;;
-  gemini)
-    bash "${PLUGIN_ROOT}/scripts/gemini-run.sh" \
-      --prompt "$SYNTH_PROMPT" \
-      --cwd "$SYNTH_WT" \
-      --mode exec \
-      --timeout "$SYNTHESIS_TIMEOUT" \
-      > "${FORGE_DIR}/synth-output.txt" 2>&1
-    ;;
-esac
+ai_buddies_dispatch_buddy "$WINNER" "$SYNTH_WT" "$SYNTH_PROMPT" "$SYNTHESIS_TIMEOUT" "$FORGE_DIR" "$PLUGIN_ROOT" \
+  > "${FORGE_DIR}/synth-output.txt" 2>&1
 
 # ── Phase 3: Score the synthesized version ───────────────────────────────────
 # Generate diff

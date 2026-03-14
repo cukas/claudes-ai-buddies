@@ -72,94 +72,8 @@ ai_buddies_config_set() {
   mv "$tmp" "$AI_BUDDIES_CONFIG"
 }
 
-# ── Find claude binary ───────────────────────────────────────────────────────
-ai_buddies_find_claude() {
-  # Check explicit config override first
-  local configured
-  configured="$(ai_buddies_config "claude_path" "")"
-  if [[ -n "$configured" && -x "$configured" ]]; then
-    echo "$configured"
-    return 0
-  fi
-
-  # Standard PATH lookup
-  if command -v claude &>/dev/null; then
-    command -v claude
-    return 0
-  fi
-
-  # Common install locations
-  local candidates=(
-    "${HOME}/.local/bin/claude"
-    "/usr/local/bin/claude"
-    "${HOME}/.nvm/versions/node/*/bin/claude"
-  )
-  for pattern in "${candidates[@]}"; do
-    # shellcheck disable=SC2086
-    for bin in $pattern; do
-      if [[ -x "$bin" ]]; then
-        echo "$bin"
-        return 0
-      fi
-    done
-  done
-
-  return 1
-}
-
-# ── Get claude version ───────────────────────────────────────────────────────
-ai_buddies_claude_version() {
-  local claude_bin
-  claude_bin="$(ai_buddies_find_claude 2>/dev/null)" || return 1
-  "$claude_bin" --version 2>/dev/null | head -1
-}
-
-# ── Get claude model (optional override) ─────────────────────────────────────
-ai_buddies_claude_model() {
-  ai_buddies_config "claude_model" ""
-}
-
-# ── Find codex binary ───────────────────────────────────────────────────────
-ai_buddies_find_codex() {
-  # Check explicit config override first
-  local configured
-  configured="$(ai_buddies_config "codex_path" "")"
-  if [[ -n "$configured" && -x "$configured" ]]; then
-    echo "$configured"
-    return 0
-  fi
-
-  # Standard PATH lookup
-  if command -v codex &>/dev/null; then
-    command -v codex
-    return 0
-  fi
-
-  # Common install locations
-  local candidates=(
-    "${HOME}/.nvm/versions/node/*/bin/codex"
-    "${HOME}/.local/bin/codex"
-    "/usr/local/bin/codex"
-  )
-  for pattern in "${candidates[@]}"; do
-    # shellcheck disable=SC2086
-    for bin in $pattern; do
-      if [[ -x "$bin" ]]; then
-        echo "$bin"
-        return 0
-      fi
-    done
-  done
-
-  return 1
-}
-
-# ── Get codex version ───────────────────────────────────────────────────────
-ai_buddies_codex_version() {
-  local codex_bin
-  codex_bin="$(ai_buddies_find_codex 2>/dev/null)" || return 1
-  "$codex_bin" --version 2>/dev/null | head -1
-}
+# NOTE: find_claude, find_codex, find_gemini, and their version/model helpers
+# are now thin wrappers around the generic buddy registry at the bottom of this file.
 
 # ── Session directory ────────────────────────────────────────────────────────
 ai_buddies_session_dir() {
@@ -169,81 +83,8 @@ ai_buddies_session_dir() {
   echo "$dir"
 }
 
-# ── Get codex model (optional override) ──────────────────────────────────────
-# Returns the model if explicitly configured, empty string otherwise.
-# When empty, codex uses its own default (from ~/.codex/config.toml or server).
-ai_buddies_codex_model() {
-  # 1. Plugin config override
-  local model
-  model="$(ai_buddies_config "codex_model" "")"
-  if [[ -n "$model" ]]; then
-    echo "$model"
-    return 0
-  fi
 
-  # 2. Read from codex config.toml (for display purposes)
-  local codex_config="${HOME}/.codex/config.toml"
-  if [[ -f "$codex_config" ]]; then
-    local toml_model
-    toml_model=$(grep '^model' "$codex_config" | head -1 | sed 's/.*= *"\(.*\)"/\1/')
-    if [[ -n "$toml_model" ]]; then
-      echo "$toml_model"
-      return 0
-    fi
-  fi
 
-  # 3. No override — let codex use its own default
-  echo ""
-}
-
-# ── Find gemini binary ───────────────────────────────────────────────────────
-ai_buddies_find_gemini() {
-  # Check explicit config override first
-  local configured
-  configured="$(ai_buddies_config "gemini_path" "")"
-  if [[ -n "$configured" && -x "$configured" ]]; then
-    echo "$configured"
-    return 0
-  fi
-
-  # Standard PATH lookup
-  if command -v gemini &>/dev/null; then
-    command -v gemini
-    return 0
-  fi
-
-  # Common install locations
-  local candidates=(
-    "${HOME}/.nvm/versions/node/*/bin/gemini"
-    "${HOME}/.local/bin/gemini"
-    "/usr/local/bin/gemini"
-  )
-  for pattern in "${candidates[@]}"; do
-    # shellcheck disable=SC2086
-    for bin in $pattern; do
-      if [[ -x "$bin" ]]; then
-        echo "$bin"
-        return 0
-      fi
-    done
-  done
-
-  return 1
-}
-
-# ── Get gemini version ───────────────────────────────────────────────────────
-ai_buddies_gemini_version() {
-  local gemini_bin
-  gemini_bin="$(ai_buddies_find_gemini 2>/dev/null)" || return 1
-  "$gemini_bin" --version 2>/dev/null | head -1
-}
-
-# ── Get gemini model (optional override) ─────────────────────────────────────
-# Returns the model if explicitly configured, empty string otherwise.
-# When empty, gemini uses its own default (latest from server).
-ai_buddies_gemini_model() {
-  ai_buddies_config "gemini_model" ""
-}
 
 # ── Get sandbox mode ────────────────────────────────────────────────────────
 ai_buddies_sandbox() {
@@ -755,4 +596,323 @@ ai_buddies_escape_json() {
     # Minimal fallback
     printf '"%s"' "$(printf '%s' "$input" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g')"
   fi
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Dynamic Buddy Registry (v3)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Registry directory ───────────────────────────────────────────────────────
+# Returns paths to buddy definitions: builtin + user directories.
+ai_buddies_registry_dir() {
+  local plugin_root="${PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  local builtin_dir="${plugin_root}/buddies/builtin"
+  local user_dir="${AI_BUDDIES_HOME}/buddies"
+  echo "${builtin_dir}:${user_dir}"
+}
+
+# ── List all registered buddy IDs ────────────────────────────────────────────
+ai_buddies_list_buddies() {
+  local registry
+  registry="$(ai_buddies_registry_dir)"
+  IFS=':' read -ra dirs <<< "$registry"
+
+  local seen=()
+  for dir in "${dirs[@]}"; do
+    [[ -d "$dir" ]] || continue
+    for f in "$dir"/*.json; do
+      [[ -f "$f" ]] || continue
+      local id
+      id=$(basename "$f" .json)
+      # Deduplicate (user overrides builtin)
+      local dup=false
+      for s in "${seen[@]+"${seen[@]}"}"; do
+        [[ "$s" == "$id" ]] && { dup=true; break; }
+      done
+      [[ "$dup" == "true" ]] && continue
+      seen+=("$id")
+      echo "$id"
+    done
+  done
+}
+
+# ── Find buddy JSON file (user dir takes precedence) ────────────────────────
+_ai_buddies_find_buddy_json() {
+  local id="$1"
+  local registry
+  registry="$(ai_buddies_registry_dir)"
+  IFS=':' read -ra dirs <<< "$registry"
+
+  # User dir first (override), then builtin
+  local user_dir="${dirs[1]:-}"
+  local builtin_dir="${dirs[0]:-}"
+
+  if [[ -n "$user_dir" && -f "${user_dir}/${id}.json" ]]; then
+    echo "${user_dir}/${id}.json"
+    return 0
+  fi
+  if [[ -n "$builtin_dir" && -f "${builtin_dir}/${id}.json" ]]; then
+    echo "${builtin_dir}/${id}.json"
+    return 0
+  fi
+  return 1
+}
+
+# ── Read a field from buddy JSON via jq ──────────────────────────────────────
+# Usage: ai_buddies_buddy_config ID KEY [DEFAULT]
+ai_buddies_buddy_config() {
+  local id="$1"
+  local key="$2"
+  local default="${3:-}"
+
+  local json_file
+  json_file=$(_ai_buddies_find_buddy_json "$id" 2>/dev/null) || {
+    echo "$default"
+    return 0
+  }
+
+  if command -v jq &>/dev/null; then
+    local val
+    val=$(jq -r --arg k "$key" '.[$k] // empty' "$json_file" 2>/dev/null)
+    if [[ -n "$val" && "$val" != "null" ]]; then
+      echo "$val"
+      return 0
+    fi
+  fi
+
+  echo "$default"
+}
+
+# ── Generic binary finder ────────────────────────────────────────────────────
+# Replaces find_codex, find_gemini, find_claude.
+ai_buddies_find_buddy() {
+  local id="$1"
+  local binary
+  binary=$(ai_buddies_buddy_config "$id" "binary" "$id")
+
+  # 1. Check explicit config override (e.g. codex_path)
+  local configured
+  configured="$(ai_buddies_config "${id}_path" "")"
+  if [[ -n "$configured" && -x "$configured" ]]; then
+    echo "$configured"
+    return 0
+  fi
+
+  # 2. Standard PATH lookup
+  if command -v "$binary" &>/dev/null; then
+    command -v "$binary"
+    return 0
+  fi
+
+  # 3. Search paths from buddy JSON
+  local json_file
+  json_file=$(_ai_buddies_find_buddy_json "$id" 2>/dev/null) || return 1
+
+  if command -v jq &>/dev/null; then
+    local paths
+    paths=$(jq -r '.search_paths[]? // empty' "$json_file" 2>/dev/null)
+    while IFS= read -r pattern; do
+      [[ -z "$pattern" ]] && continue
+      # Expand ${HOME}
+      pattern="${pattern//\$\{HOME\}/${HOME}}"
+      # shellcheck disable=SC2086
+      for bin in $pattern; do
+        if [[ -x "$bin" ]]; then
+          echo "$bin"
+          return 0
+        fi
+      done
+    done <<< "$paths"
+  fi
+
+  return 1
+}
+
+# ── Generic version query ────────────────────────────────────────────────────
+ai_buddies_buddy_version() {
+  local id="$1"
+  local buddy_bin
+  buddy_bin="$(ai_buddies_find_buddy "$id" 2>/dev/null)" || return 1
+
+  local version_cmd
+  version_cmd=$(ai_buddies_buddy_config "$id" "version_cmd" "--version")
+  # version_cmd in JSON is an array but we only use first element
+  if command -v jq &>/dev/null; then
+    local json_file
+    json_file=$(_ai_buddies_find_buddy_json "$id" 2>/dev/null) || true
+    if [[ -n "$json_file" ]]; then
+      version_cmd=$(jq -r '.version_cmd[0] // "--version"' "$json_file" 2>/dev/null)
+    fi
+  fi
+
+  # shellcheck disable=SC2086
+  "$buddy_bin" ${version_cmd:---version} 2>/dev/null | head -1
+}
+
+# ── Generic model query ──────────────────────────────────────────────────────
+ai_buddies_buddy_model() {
+  local id="$1"
+  local config_key
+  config_key=$(ai_buddies_buddy_config "$id" "model_config_key" "${id}_model")
+  ai_buddies_config "$config_key" ""
+}
+
+# ── Available buddies (installed only) ───────────────────────────────────────
+# Returns CSV of installed buddy IDs. Replaces hardcoded arrays.
+ai_buddies_available_buddies() {
+  local available=()
+  while IFS= read -r id; do
+    if ai_buddies_find_buddy "$id" &>/dev/null; then
+      available+=("$id")
+    fi
+  done < <(ai_buddies_list_buddies)
+
+  local IFS=','
+  echo "${available[*]}"
+}
+
+# ── Check mode support ──────────────────────────────────────────────────────
+ai_buddies_buddy_supports_mode() {
+  local id="$1"
+  local mode="$2"
+
+  local json_file
+  json_file=$(_ai_buddies_find_buddy_json "$id" 2>/dev/null) || return 1
+
+  if command -v jq &>/dev/null; then
+    local has_mode
+    has_mode=$(jq -r --arg m "$mode" '.modes // [] | index($m) // empty' "$json_file" 2>/dev/null)
+    [[ -n "$has_mode" ]] && return 0
+  fi
+
+  return 1
+}
+
+# ── Generic dispatch ─────────────────────────────────────────────────────────
+# Replaces case statements in forge-run.sh, forge-synthesize.sh, forge-spectest.sh.
+# Usage: ai_buddies_dispatch_buddy ID WT PROMPT TIMEOUT [DIR] [ROOT]
+ai_buddies_dispatch_buddy() {
+  local id="$1"
+  local wt="$2"
+  local prompt="$3"
+  local timeout="$4"
+  local output_dir="${5:-$(dirname "$wt")}"
+  local plugin_root="${6:-${PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
+
+  local adapter
+  adapter=$(ai_buddies_buddy_config "$id" "adapter_script" "buddy-run.sh")
+  local is_builtin
+  is_builtin=$(ai_buddies_buddy_config "$id" "builtin" "false")
+
+  if [[ "$is_builtin" == "true" ]]; then
+    # Builtin buddies use their dedicated adapter scripts
+    bash "${plugin_root}/scripts/${adapter}" \
+      --prompt "$prompt" \
+      --cwd "$wt" \
+      --mode exec \
+      --timeout "$timeout"
+  else
+    # Non-builtin buddies use the generic buddy-run.sh
+    bash "${plugin_root}/scripts/buddy-run.sh" \
+      --id "$id" \
+      --prompt "$prompt" \
+      --cwd "$wt" \
+      --mode exec \
+      --timeout "$timeout"
+  fi
+}
+
+# ── Backward-compatible wrappers (thin) ──────────────────────────────────────
+# These delegate to the generic registry functions so old code keeps working.
+ai_buddies_find_claude()    { ai_buddies_find_buddy "claude"; }
+ai_buddies_claude_version() { ai_buddies_buddy_version "claude"; }
+ai_buddies_claude_model()   { ai_buddies_buddy_model "claude"; }
+ai_buddies_find_codex()     { ai_buddies_find_buddy "codex"; }
+ai_buddies_codex_version()  { ai_buddies_buddy_version "codex"; }
+ai_buddies_codex_model()    { ai_buddies_buddy_model "codex"; }
+ai_buddies_find_gemini()    { ai_buddies_find_buddy "gemini"; }
+ai_buddies_gemini_version() { ai_buddies_buddy_version "gemini"; }
+ai_buddies_gemini_model()   { ai_buddies_buddy_model "gemini"; }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Tribunal helpers (v3)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Tribunal config readers ──────────────────────────────────────────────────
+ai_buddies_tribunal_rounds() {
+  ai_buddies_config "tribunal_rounds" "2"
+}
+
+ai_buddies_tribunal_max_buddies() {
+  ai_buddies_config "tribunal_max_buddies" "3"
+}
+
+# ── Build tribunal prompt ────────────────────────────────────────────────────
+# Usage: ai_buddies_build_tribunal_prompt "question" "position" ROUND TOTAL [prev_args]
+ai_buddies_build_tribunal_prompt() {
+  local question="$1"
+  local position="$2"
+  local round="$3"
+  local total="$4"
+  local prev_args="${5:-}"
+
+  local prompt="ADVERSARIAL DEBATE — Round ${round}/${total}"
+  prompt+=$'\n\n'"QUESTION: ${question}"
+  prompt+=$'\n\n'"YOUR POSITION: ${position}"
+  prompt+=$'\n\n'"EVIDENCE PROTOCOL:"
+  prompt+=$'\n'"Every claim MUST include a citation: {\"claim\":\"...\",\"file\":\"path\",\"lines\":\"N-M\",\"evidence\":\"quoted code\",\"severity\":1-5}"
+  prompt+=$'\n'"Claims without file:line evidence score ZERO."
+  prompt+=$'\n\n'"RULES:"
+  prompt+=$'\n'"- Argue your assigned position with real code evidence."
+  prompt+=$'\n'"- Reference specific files and line numbers."
+  prompt+=$'\n'"- If you genuinely cannot find evidence for your position, say so."
+  prompt+=$'\n'"- Respond with a JSON array of evidence objects. No other text."
+
+  if [[ -n "$prev_args" ]]; then
+    prompt+=$'\n\n'"PREVIOUS ROUND ARGUMENTS:"$'\n'"${prev_args}"
+    prompt+=$'\n\n'"ADDRESS the opposing arguments above. Rebut with evidence or concede specific points."
+  fi
+
+  printf '%s' "$prompt"
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ELO helpers (v3)
+# ══════════════════════════════════════════════════════════════════════════════
+
+ai_buddies_elo_enabled() {
+  ai_buddies_config "elo_enabled" "true"
+}
+
+ai_buddies_elo_k_factor() {
+  ai_buddies_config "elo_k_factor" "32"
+}
+
+ai_buddies_elo_file() {
+  echo "${AI_BUDDIES_HOME}/elo.json"
+}
+
+# ── Detect task class from description ───────────────────────────────────────
+# Keyword-based classification: algorithm, refactor, bugfix, feature, test, docs, other
+ai_buddies_detect_task_class() {
+  local desc="$1"
+  local lower
+  lower=$(printf '%s' "$desc" | tr '[:upper:]' '[:lower:]')
+
+  case "$lower" in
+    *algorithm*|*sort*|*search*|*scoring*|*math*|*compute*|*calculate*)
+      echo "algorithm" ;;
+    *refactor*|*rename*|*extract*|*simplify*|*reorganize*|*clean*)
+      echo "refactor" ;;
+    *fix*|*bug*|*error*|*crash*|*broken*|*regression*)
+      echo "bugfix" ;;
+    *test*|*spec*|*coverage*|*assert*)
+      echo "test" ;;
+    *doc*|*readme*|*comment*|*changelog*)
+      echo "docs" ;;
+    *add*|*implement*|*create*|*build*|*feature*|*new*)
+      echo "feature" ;;
+    *)
+      echo "other" ;;
+  esac
 }
