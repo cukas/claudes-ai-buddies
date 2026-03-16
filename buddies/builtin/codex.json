@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "codex",
+  "display_name": "Codex (OpenAI)",
+  "binary": "codex",
+  "search_paths": [
+    "${HOME}/.nvm/versions/node/*/bin/codex",
+    "${HOME}/.local/bin/codex",
+    "/usr/local/bin/codex"
+  ],
+  "version_cmd": ["--version"],
+  "model_config_key": "codex_model",
+  "modes": ["exec", "review"],
+  "is_local": false,
+  "builtin": true,
+  "adapter_script": "codex-run.sh",
+  "install_hint": "npm install -g @openai/codex",
+  "timeout": 120
+}

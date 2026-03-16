@@ -50,15 +50,15 @@ When building a plan, Claude can tag tasks:
 ### Phase 0: Setup
 
 1. **Parse args.** Extract the task, `--fitness` command, optional `--timeout`, `--async`, `--engines`, `--starter`.
-2. **Detect engines.** Source lib.sh and check binaries:
+2. **Detect engines.** Source lib.sh and use the dynamic registry:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"
-CLAUDE_BIN=$(ai_buddies_find_claude 2>/dev/null) || CLAUDE_BIN=""
-CODEX_BIN=$(ai_buddies_find_codex 2>/dev/null) || CODEX_BIN=""
-GEMINI_BIN=$(ai_buddies_find_gemini 2>/dev/null) || GEMINI_BIN=""
+AVAILABLE=$(ai_buddies_available_buddies)  # CSV: "claude,codex,gemini,aider,..."
 FORGE_TIMEOUT=$(ai_buddies_forge_timeout)
 ```
+
+Any registered buddy with an installed binary will participate.
 
 3. **Create forge directory:**
 
@@ -230,6 +230,15 @@ All config via `~/.claudes-ai-buddies/config.json`:
 | `forge_max_critiques` | `3` | Max critique hunks per loser |
 | `forge_require_baseline_check` | `true` | Run fitness on base before forging |
 | `forge_timeout` | `600` | Engine timeout in seconds |
+| `elo_enabled` | `true` | Track ELO ratings after each forge |
+| `elo_k_factor` | `32` | ELO K-factor |
+
+## ELO Integration (v3)
+
+After scoring, forge automatically updates ELO ratings:
+- Winner gains points vs each loser (per task class)
+- Task class is auto-detected from the task description (algorithm, bugfix, refactor, feature, test, docs, other)
+- View ratings with `/leaderboard`
 
 ## Rules
 

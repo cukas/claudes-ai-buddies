@@ -1,5 +1,32 @@
 # Changelog
 
+## 3.0.0 (2026-03-14)
+
+*Multi-AI Darwinism — the buddy roster is now dynamic. Any CLI can join the arena.*
+
+### Added
+- **Dynamic Buddy Registry** — JSON-based capability contracts for each buddy. Builtin buddies (`buddies/builtin/*.json`) + user-registered buddies (`~/.claudes-ai-buddies/buddies/*.json`). Generic `ai_buddies_find_buddy()`, `ai_buddies_available_buddies()`, `ai_buddies_dispatch_buddy()` replace hardcoded engine detection and case-statement dispatch
+- **`/add-buddy`** — Register any CLI-based AI tool as a buddy. One-liner or interactive wizard
+- **`/tribunal`** — Adversarial debate. Two buddies argue opposite positions with evidence citations (FILE:LINE). Claude judges based on evidence quality, not consensus. Configurable rounds
+- **`/leaderboard`** — Persistent ELO ratings. Updated after each `/forge` run. Per-task-class tracking (algorithm, bugfix, refactor, feature, test, docs)
+- **`buddy-run.sh`** — Generic wrapper for non-builtin buddies. Prompt via temp file, captures output
+- **`buddy-register.sh`** — CLI helper to create buddy JSON definitions
+- **`tribunal-run.sh`** — Adversarial debate orchestrator with multi-round cross-examination
+- **`elo-update.sh`** — Pure awk/jq ELO calculator with provisional status
+- **`elo-show.sh`** — Formatted leaderboard display
+- New config keys: `tribunal_rounds`, `tribunal_max_buddies`, `elo_enabled`, `elo_k_factor`
+- ~85 new tests (registry, tribunal, ELO, dispatch)
+
+### Changed
+- **Backward-compatible wrappers** — `ai_buddies_find_codex()`, `ai_buddies_codex_version()`, etc. are now thin wrappers around the generic registry functions
+- **forge-run.sh** — uses `ai_buddies_available_buddies()` for detection, `ai_buddies_dispatch_buddy()` for dispatch, auto-updates ELO after scoring
+- **forge-synthesize.sh** — critique and synthesis dispatch via generic `ai_buddies_dispatch_buddy()`
+- **forge-spectest.sh** — engine detection and dispatch via registry
+- **session-start.sh** — dynamic engine loop, shows `/tribunal`, `/leaderboard`, `/add-buddy` in banner
+- **brainstorm SKILL.md** — dynamic buddy selection, top N cap
+- **forge SKILL.md** — dynamic buddies, ELO integration docs
+- **buddy-help.md** — new skills, config keys, registry docs
+
 ## 2.0.0 (2026-03-12)
 
 *Forge was born from a `/brainstorm` session — Claude, Codex, and Gemini designed the concept, picked the name, and shaped the architecture together. The feature they planned is built by the engines that imagined it.*

@@ -83,15 +83,12 @@ _spectest_cleanup() {
 }
 trap _spectest_cleanup EXIT INT TERM
 
-# ── Detect engines ───────────────────────────────────────────────────────────
-CLAUDE_BIN=$(ai_buddies_find_claude 2>/dev/null) || CLAUDE_BIN=""
-CODEX_BIN=$(ai_buddies_find_codex 2>/dev/null) || CODEX_BIN=""
-GEMINI_BIN=$(ai_buddies_find_gemini 2>/dev/null) || GEMINI_BIN=""
-
+# ── Detect engines (v3: dynamic registry) ────────────────────────────────────
+_available_csv=$(ai_buddies_available_buddies)
 ENGINES=()
-[[ -n "$CLAUDE_BIN" ]] && ENGINES+=(claude)
-[[ -n "$CODEX_BIN" ]]  && ENGINES+=(codex)
-[[ -n "$GEMINI_BIN" ]] && ENGINES+=(gemini)
+if [[ -n "$_available_csv" ]]; then
+  IFS=',' read -ra ENGINES <<< "$_available_csv"
+fi
 
 if [[ ${#ENGINES[@]} -eq 0 ]]; then
   echo "ERROR: No engines available for spectest" >&2
@@ -135,35 +132,9 @@ for engine in "${ENGINES[@]}"; do
   ACTIVE_ENGINES+=("$engine")
   _SPECTEST_WTS+=("$wt")
 
-  case "$engine" in
-    claude)
-      bash "${PLUGIN_ROOT}/scripts/claude-run.sh" \
-        --prompt "$SPECTEST_PROMPT" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$TIMEOUT" \
-        > "${SPECTEST_DIR}/${engine}-output.txt" 2>&1 &
-      PIDS+=($!); _SPECTEST_PIDS+=($!)
-      ;;
-    codex)
-      bash "${PLUGIN_ROOT}/scripts/codex-run.sh" \
-        --prompt "$SPECTEST_PROMPT" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$TIMEOUT" \
-        > "${SPECTEST_DIR}/${engine}-output.txt" 2>&1 &
-      PIDS+=($!); _SPECTEST_PIDS+=($!)
-      ;;
-    gemini)
-      bash "${PLUGIN_ROOT}/scripts/gemini-run.sh" \
-        --prompt "$SPECTEST_PROMPT" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$TIMEOUT" \
-        > "${SPECTEST_DIR}/${engine}-output.txt" 2>&1 &
-      PIDS+=($!); _SPECTEST_PIDS+=($!)
-      ;;
-  esac
+  ai_buddies_dispatch_buddy "$engine" "$wt" "$SPECTEST_PROMPT" "$TIMEOUT" "$SPECTEST_DIR" "$PLUGIN_ROOT" \
+    > "${SPECTEST_DIR}/${engine}-output.txt" 2>&1 &
+  PIDS+=($!); _SPECTEST_PIDS+=($!)
 done
 
 # ── Wait for all engines ─────────────────────────────────────────────────────

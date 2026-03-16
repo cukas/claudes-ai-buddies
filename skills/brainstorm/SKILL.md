@@ -29,21 +29,23 @@ NEEDS: [what you'd need from the user — files, context, access, clarification]
 Task: USER_TASK_HERE
 ```
 
-3. **Run both engines in parallel.** Single message, two Bash calls.
+3. **Detect available buddies and run them in parallel.** Use the dynamic registry:
 
 ```bash
-# Call 1 (parallel)
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" \
-  --prompt "ASSESSMENT_PROMPT" \
-  --cwd "/path/to/project" \
-  --mode exec
-
-# Call 2 (parallel)
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-run.sh" \
-  --prompt "ASSESSMENT_PROMPT" \
-  --cwd "/path/to/project" \
-  --mode exec
+source "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"
+AVAILABLE=$(ai_buddies_available_buddies)  # CSV: "claude,codex,gemini,aider,..."
 ```
+
+For each available buddy (excluding claude — you ARE claude), dispatch in parallel:
+
+```bash
+# For each buddy ID in the available list:
+ai_buddies_dispatch_buddy "BUDDY_ID" "$(pwd)" "ASSESSMENT_PROMPT" 120 "/tmp" "${CLAUDE_PLUGIN_ROOT}"
+```
+
+Or use the specific adapter scripts for builtin buddies (codex-run.sh, gemini-run.sh).
+
+Cap at top 4 buddies to keep the table readable.
 
 4. **Read both output files** (parallel).
 5. **Add your own assessment.** Same format — confidence, approach, risks, needs. Be honest. If you're the best fit, say so. If not, say that too.
@@ -54,17 +56,17 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-run.sh" \
 ```markdown
 ## Task: [short task summary]
 
-| | Claude (Anthropic) | Codex (OpenAI) | Gemini (Google) |
-|---|---|---|---|
-| Confidence | X% | Y% | Z% |
-| Approach | ... | ... | ... |
-| Risks | ... | ... | ... |
-| Needs | ... | ... | ... |
+| | Claude (Anthropic) | [Buddy 1 display name] | [Buddy 2 display name] | ... |
+|---|---|---|---|---|
+| Confidence | X% | Y% | Z% | ... |
+| Approach | ... | ... | ... | ... |
+| Risks | ... | ... | ... | ... |
+| Needs | ... | ... | ... | ... |
 
 **Recommendation:** [Who should take this and why — or "user's call" if it's close]
 ```
 
-Keep the table cells short. If an engine gave a long response, summarize to 1-2 sentences per cell.
+Columns adapt to whatever buddies are available. Keep the table cells short. If a buddy gave a long response, summarize to 1-2 sentences per cell.
 
 ## Calibration — your most important job
 

@@ -72,15 +72,12 @@ _forge_run_cleanup() {
 }
 trap _forge_run_cleanup EXIT INT TERM
 
-# ── Detect available engines ─────────────────────────────────────────────────
-CLAUDE_BIN=$(ai_buddies_find_claude 2>/dev/null) || CLAUDE_BIN=""
-CODEX_BIN=$(ai_buddies_find_codex 2>/dev/null) || CODEX_BIN=""
-GEMINI_BIN=$(ai_buddies_find_gemini 2>/dev/null) || GEMINI_BIN=""
-
+# ── Detect available engines (v3: dynamic registry) ──────────────────────────
+_available_csv=$(ai_buddies_available_buddies)
 ALL_AVAILABLE=()
-[[ -n "$CLAUDE_BIN" ]] && ALL_AVAILABLE+=(claude)
-[[ -n "$CODEX_BIN" ]]  && ALL_AVAILABLE+=(codex)
-[[ -n "$GEMINI_BIN" ]] && ALL_AVAILABLE+=(gemini)
+if [[ -n "$_available_csv" ]]; then
+  IFS=',' read -ra ALL_AVAILABLE <<< "$_available_csv"
+fi
 
 # Filter by requested engines if specified
 ENGINES=()
@@ -141,39 +138,15 @@ _create_worktree_for() {
   fi
 }
 
-# ── Helper: dispatch a single engine ─────────────────────────────────────────
+# ── Helper: dispatch a single engine (v3: generic registry) ──────────────────
 _dispatch_engine() {
   local engine="$1"
   local wt="$2"
   local prompt="$3"
   local timeout="$4"
 
-  case "$engine" in
-    claude)
-      bash "${PLUGIN_ROOT}/scripts/claude-run.sh" \
-        --prompt "$prompt" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$timeout" \
-        > "${FORGE_DIR}/${engine}-output.txt" 2>&1
-      ;;
-    codex)
-      bash "${PLUGIN_ROOT}/scripts/codex-run.sh" \
-        --prompt "$prompt" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$timeout" \
-        > "${FORGE_DIR}/${engine}-output.txt" 2>&1
-      ;;
-    gemini)
-      bash "${PLUGIN_ROOT}/scripts/gemini-run.sh" \
-        --prompt "$prompt" \
-        --cwd "$wt" \
-        --mode exec \
-        --timeout "$timeout" \
-        > "${FORGE_DIR}/${engine}-output.txt" 2>&1
-      ;;
-  esac
+  ai_buddies_dispatch_buddy "$engine" "$wt" "$prompt" "$timeout" "$FORGE_DIR" "$PLUGIN_ROOT" \
+    > "${FORGE_DIR}/${engine}-output.txt" 2>&1
 }
 
 # ── Helper: score an engine's worktree ───────────────────────────────────────
@@ -468,6 +441,19 @@ if [[ "$CLOSE_CALL" == "true" && "$ENABLE_SYNTHESIS" == "true" && ${#SCORED_ENGI
   fi
 else
   ai_buddies_debug "forge-run: skipping synthesis (close_call=$CLOSE_CALL, enabled=$ENABLE_SYNTHESIS, engines=${#SCORED_ENGINES[@]})"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ELO: Update ratings (v3)
+# ══════════════════════════════════════════════════════════════════════════════
+if [[ "$WINNER" != "none" && "$(ai_buddies_elo_enabled)" == "true" ]]; then
+  TASK_CLASS=$(ai_buddies_detect_task_class "$TASK")
+  for engine in "${SCORED_ENGINES[@]}"; do
+    [[ "$engine" == "$WINNER" ]] && continue
+    bash "${PLUGIN_ROOT}/scripts/elo-update.sh" \
+      --winner "$WINNER" --loser "$engine" --task-class "$TASK_CLASS" 2>/dev/null || true
+  done
+  ai_buddies_debug "forge-run: ELO updated for task_class=$TASK_CLASS"
 fi
 
 # ── Output manifest path ────────────────────────────────────────────────────

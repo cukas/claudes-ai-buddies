@@ -3,10 +3,10 @@
 <img src="assets/banner.svg" alt="Claude's AI Buddies" width="100%"/>
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-140%2F140-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-225%2B-brightgreen.svg)](#-testing)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-blueviolet.svg)](https://github.com/cukas/claude-plugins)
 
-*Three AI engines. One codebase. They compete, you ship.*
+*Any AI can join. They compete. You ship.*
 
 </div>
 
@@ -15,7 +15,7 @@
 ## Quick Start
 
 ```bash
-# 1. Install the engines you want (one or both)
+# 1. Install the engines you want (one or more)
 npm install -g @openai/codex        # OpenAI Codex
 npm install -g @google/gemini-cli   # Google Gemini
 
@@ -30,7 +30,7 @@ claude plugin install claudes-ai-buddies@cukas
 # Done — start a new Claude Code session
 ```
 
-> Works with just Codex, just Gemini, or both. Install only what you need.
+> Works with just Codex, just Gemini, both, or any custom AI CLI you register.
 
 ---
 
@@ -38,13 +38,28 @@ claude plugin install claudes-ai-buddies@cukas
 
 | Command | What it does |
 |---------|-------------|
-| `/brainstorm "task"` | Confidence bid — three AIs assess the task, you pick who builds it |
-| `/forge "task" --fitness "cmd"` | Three-way build competition with automated scoring |
+| `/brainstorm "task"` | Confidence bid — available buddies assess the task, you pick who builds it |
+| `/forge "task" --fitness "cmd"` | Competitive build with automated scoring |
+| `/tribunal "question"` | Adversarial debate — two buddies argue with evidence, Claude judges |
+| `/leaderboard` | Show ELO ratings from forge competitions |
+| `/add-buddy` | Register any CLI as a new buddy |
 | `/codex "prompt"` | Ask Codex anything — delegate, brainstorm, second opinion |
 | `/gemini "prompt"` | Ask Gemini anything — different model, different perspective |
 | `/codex-review` | Code review via Codex (uncommitted, branch, or commit) |
 | `/gemini-review` | Code review via Gemini (uncommitted, branch, or commit) |
 | `/buddy-help` | Full reference, config, troubleshooting |
+
+---
+
+## Dynamic Buddy Registry
+
+**v3 makes the engine roster dynamic.** Any CLI-based AI tool can become a buddy:
+
+```
+/add-buddy --id aider --binary aider --display "Aider" --modes exec
+```
+
+Registered buddies automatically participate in `/forge`, `/brainstorm`, and `/tribunal`. Buddy definitions are JSON capability contracts stored in `buddies/builtin/` (shipped) and `~/.claudes-ai-buddies/buddies/` (user-added).
 
 ---
 
@@ -56,22 +71,11 @@ claude plugin install claudes-ai-buddies@cukas
 /brainstorm "Fix the race condition in the WebSocket reconnection handler"
 ```
 
-Each engine assesses the task, rates their confidence, and proposes an approach. Claude calibrates the scores and recommends who should take it.
+Each available buddy assesses the task, rates their confidence, and proposes an approach. Claude calibrates the scores and recommends who should take it.
 
-```
-| | Claude (Anthropic) | Codex (OpenAI) | Gemini (Google) |
-|---|---|---|---|
-| Confidence | 85% | 70% | 60% |
-| Approach | Trace reconnect flow, | Add mutex lock on | Use exponential backoff |
-|           | find state leak       | shared connection  | with jitter            |
-| Risks | Might miss edge case | Could deadlock if | Doesn't fix root cause, |
-|       | in retry logic       | not scoped right  | just masks it          |
-
-Recommendation: Claude — highest confidence, already knows the codebase
-```
-
+- **Dynamic roster** — table adapts to however many buddies are available
 - **Three training sets catch blind spots** — disagreements are the most valuable signal
-- **Other engines burn their tokens, not yours** — heavy thinking offloaded to Codex/Gemini
+- **Other engines burn their tokens, not yours** — heavy thinking offloaded to peers
 - **Claude calibrates the bids** — adjusts inflated/deflated scores based on approach quality
 
 ---
@@ -82,7 +86,7 @@ Recommendation: Claude — highest confidence, already knows the codebase
 /forge "Add input validation to math utils" --fitness "npm test"
 ```
 
-Three engines independently implement the same task in isolated git worktrees. A staged pipeline scores them objectively — the best code wins.
+Available buddies independently implement the same task in isolated git worktrees. A staged pipeline scores them objectively — the best code wins.
 
 ```
 ## Forge Scoreboard
@@ -95,13 +99,15 @@ Three engines independently implement the same task in isolated git worktrees. A
 | Lint warnings | 2 | 0 | 0 |
 
 Winner: Gemini — score 89/100.
+ELO updated: Gemini 1200→1216, Claude 1200→1184, Codex 1200→1184
 ```
 
 - **Staged pipeline** — starter runs first; challengers only if needed; synthesis on close calls
 - **Composite scoring** — diff size, lint, style, test pass, duration = objective 0-100 score
+- **ELO tracking** — persistent ratings updated after each forge, per task class
 - **Speculative tests** — omit `--fitness` and engines propose test suites
 - **`--async`** — run in background, continue your conversation
-- **Graceful degradation** — works with 3, 2, or 1 engine
+- **Graceful degradation** — works with any number of engines (3, 2, or 1)
 
 <details>
 <summary><strong>How Forge works under the hood</strong></summary>
@@ -111,13 +117,40 @@ Winner: Gemini — score 89/100.
 3. **Stage 2: Challengers** — remaining engines run in parallel if the starter didn't clear the bar
 4. **Stage 3: Synthesis** — on close calls (spread < 8 pts), losers send critique hunks. Winner refines selectively
 5. **Scoreboard** — composite scores (diff 30%, lint 15%, style 15%, files 10%, duration 5%, tests 25%)
-6. **Converge** — you approve the winning diff before it touches your working tree
+6. **ELO** — winner gains rating vs each loser, per auto-detected task class
+7. **Converge** — you approve the winning diff before it touches your working tree
 
-**What to forge:** Algorithms, scoring logic, race conditions, performance-critical code — anything where three perspectives beat one.
+**What to forge:** Algorithms, scoring logic, race conditions, performance-critical code — anything where multiple perspectives beat one.
 
 **What NOT to forge:** Types, imports, config, UI layout — things with one obvious answer.
 
 </details>
+
+---
+
+## Tribunal — Adversarial Debate
+
+```
+/tribunal "Should we refactor the auth middleware to use async/await?"
+```
+
+Two buddies argue opposite positions with **evidence citations** (file:line). Claude judges based on evidence quality, not consensus.
+
+- **Evidence protocol** — every claim requires `{file, lines, evidence, severity}`. No evidence = score zero
+- **Cross-examination** — configurable rounds of back-and-forth rebuttals
+- **Evidence-weighted judging** — quality (0-10) x severity (1-5) per claim
+- **Auto-triggered** — fires on forge close calls or review disagreements
+
+---
+
+## ELO Leaderboard
+
+```
+/leaderboard
+/leaderboard algorithm
+```
+
+Persistent ELO ratings tracked per task class (algorithm, bugfix, refactor, feature, test, docs). Updated automatically after each forge.
 
 ---
 
@@ -152,7 +185,7 @@ Winner: Gemini — score 89/100.
 5. Add retry status to UI connection indicator
 ```
 
-Claude handles the straightforward tasks directly. `[forge]` tasks trigger three-way competition.
+Claude handles the straightforward tasks directly. `[forge]` tasks trigger multi-way competition.
 
 ---
 
@@ -167,6 +200,8 @@ Optional — works out of the box. Config at `~/.claudes-ai-buddies/config.json`
 | `timeout` | `120` | Max seconds per call (forge uses 600s) |
 | `sandbox` | `full-auto` | `full-auto` or `suggest` |
 | `debug` | `false` | Enable debug logging |
+| `elo_enabled` | `true` | Track ELO ratings |
+| `tribunal_rounds` | `2` | Tribunal cross-examination rounds |
 
 ---
 
@@ -174,12 +209,13 @@ Optional — works out of the box. Config at `~/.claudes-ai-buddies/config.json`
 
 ```
 ┌──────────┐     ┌──────────────┐     ┌─────────────┐     ┌──────────────┐
-│   User   │────>│  Claude Code  │────>│  Wrapper.sh  │────>│  Peer AI CLI  │
-│          │     │  (orchestrator│     │  (timeout,   │     │  (codex exec  │
-│          │<────│   + judge)    │<────│   capture)   │<────│   gemini -p)  │
+│   User   │────>│  Claude Code  │────>│  Registry    │────>│  Any AI CLI   │
+│          │     │  (orchestrator│     │  (buddy JSON │     │  (codex, gem  │
+│          │<────│   + judge)    │<────│   + dispatch)│<────│   aider, ...) │
 └──────────┘     └──────────────┘     └─────────────┘     └──────────────┘
 ```
 
+- **Dynamic registry** — any CLI can become a buddy via JSON capability contract
 - **No MCP servers** — direct CLI subprocess calls
 - **No API keys in transit** — each engine uses its own auth
 - **Parallel execution** — engines run simultaneously
@@ -196,7 +232,7 @@ bash tests/run-tests.sh
 ```
 === claudes-ai-buddies test suite ===
   ...
-=== Results: 140/140 passed, 0 failed ===
+=== Results: 225+/225+ passed, 0 failed ===
 ```
 
 ---

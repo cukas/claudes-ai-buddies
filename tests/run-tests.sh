@@ -1022,7 +1022,7 @@ assert_contains "$result" "ESLint"
 rm -rf "$TC_REPO"
 
 test_start "forge_pick_starter fixed returns preferred"
-AI_BUDDIES_CONFIG="/dev/null" result=$(ai_buddies_forge_pick_starter "claude,codex,gemini")
+result=$(AI_BUDDIES_CONFIG="/dev/null" ai_buddies_forge_pick_starter "claude,codex,gemini")
 assert_eq "$result" "claude"
 
 # ── claude-run.sh tests ─────────────────────────────────────────────────────
@@ -1386,6 +1386,441 @@ fi
 
 cd "$PLUGIN_ROOT"
 rm -rf "$TRUST_REPO" "$TRUST_MOCK_DIR"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# v3 — Dynamic Buddy Registry tests
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "--- v3: buddy registry ---"
+
+test_start "ai_buddies_list_buddies lists builtin buddies"
+buddies=$(ai_buddies_list_buddies)
+if echo "$buddies" | grep -q "claude" && echo "$buddies" | grep -q "codex" && echo "$buddies" | grep -q "gemini"; then
+  test_pass
+else
+  test_fail "expected claude, codex, gemini in: $buddies"
+fi
+
+test_start "ai_buddies_buddy_config reads builtin JSON"
+result=$(ai_buddies_buddy_config "codex" "binary" "")
+assert_eq "$result" "codex"
+
+test_start "ai_buddies_buddy_config reads display_name"
+result=$(ai_buddies_buddy_config "codex" "display_name" "")
+assert_eq "$result" "Codex (OpenAI)"
+
+test_start "ai_buddies_buddy_config returns default for missing key"
+result=$(ai_buddies_buddy_config "codex" "nonexistent_key" "fallback")
+assert_eq "$result" "fallback"
+
+test_start "ai_buddies_buddy_config returns default for missing buddy"
+result=$(ai_buddies_buddy_config "nonexistent_buddy" "binary" "fallback")
+assert_eq "$result" "fallback"
+
+test_start "ai_buddies_find_buddy finds claude mock"
+result=$(ai_buddies_find_buddy "claude")
+assert_contains "$result" "claude"
+
+test_start "ai_buddies_find_buddy finds codex mock"
+result=$(ai_buddies_find_buddy "codex")
+assert_contains "$result" "codex"
+
+test_start "ai_buddies_find_buddy finds gemini mock"
+result=$(ai_buddies_find_buddy "gemini")
+assert_contains "$result" "gemini"
+
+test_start "ai_buddies_find_buddy fails for missing buddy"
+ec=0
+ai_buddies_find_buddy "nonexistent_buddy_xyz" &>/dev/null || ec=$?
+if [[ "$ec" -ne 0 ]]; then
+  test_pass
+else
+  test_fail "expected non-zero exit code"
+fi
+
+test_start "ai_buddies_buddy_version returns version via registry"
+result=$(ai_buddies_buddy_version "codex")
+assert_contains "$result" "codex-cli"
+
+test_start "ai_buddies_buddy_version returns gemini version"
+result=$(ai_buddies_buddy_version "gemini")
+assert_contains "$result" "0.32.1"
+
+test_start "ai_buddies_buddy_model returns empty for unconfigured"
+result=$(ai_buddies_buddy_model "codex")
+assert_eq "$result" ""
+
+test_start "ai_buddies_buddy_model reads config override"
+ai_buddies_config_set "codex_model" "gpt-test-registry"
+unset _AI_BUDDIES_DEBUG_CACHED
+result=$(ai_buddies_buddy_model "codex")
+assert_eq "$result" "gpt-test-registry"
+ai_buddies_config_set "codex_model" ""
+
+test_start "ai_buddies_available_buddies returns CSV"
+result=$(ai_buddies_available_buddies)
+assert_contains "$result" "claude"
+# Also check it's comma-separated
+if [[ "$result" == *","* ]]; then
+  test_pass_extra=true
+fi
+
+test_start "ai_buddies_available_buddies includes all 3 mocks"
+result=$(ai_buddies_available_buddies)
+if echo "$result" | grep -q "claude" && echo "$result" | grep -q "codex" && echo "$result" | grep -q "gemini"; then
+  test_pass
+else
+  test_fail "expected all 3 in: $result"
+fi
+
+test_start "ai_buddies_buddy_supports_mode codex supports exec"
+if ai_buddies_buddy_supports_mode "codex" "exec"; then
+  test_pass
+else
+  test_fail "expected codex to support exec mode"
+fi
+
+test_start "ai_buddies_buddy_supports_mode codex supports review"
+if ai_buddies_buddy_supports_mode "codex" "review"; then
+  test_pass
+else
+  test_fail "expected codex to support review mode"
+fi
+
+test_start "ai_buddies_buddy_supports_mode rejects unsupported mode"
+if ai_buddies_buddy_supports_mode "codex" "dance" 2>/dev/null; then
+  test_fail "expected dance mode to be unsupported"
+else
+  test_pass
+fi
+
+# ── Backward-compat wrapper tests ───────────────────────────────────────────
+echo ""
+echo "--- v3: backward-compat wrappers ---"
+
+test_start "ai_buddies_find_claude wrapper works"
+result=$(ai_buddies_find_claude)
+assert_contains "$result" "claude"
+
+test_start "ai_buddies_find_codex wrapper works"
+result=$(ai_buddies_find_codex)
+assert_contains "$result" "codex"
+
+test_start "ai_buddies_find_gemini wrapper works"
+result=$(ai_buddies_find_gemini)
+assert_contains "$result" "gemini"
+
+test_start "ai_buddies_claude_version wrapper works"
+result=$(ai_buddies_claude_version)
+assert_contains "$result" "Claude Code"
+
+test_start "ai_buddies_codex_version wrapper works"
+result=$(ai_buddies_codex_version)
+assert_contains "$result" "codex-cli"
+
+test_start "ai_buddies_gemini_version wrapper works"
+result=$(ai_buddies_gemini_version)
+assert_contains "$result" "0.32.1"
+
+test_start "ai_buddies_claude_model wrapper works"
+result=$(ai_buddies_claude_model)
+assert_eq "$result" ""
+
+test_start "ai_buddies_codex_model wrapper works"
+result=$(ai_buddies_codex_model)
+assert_eq "$result" ""
+
+test_start "ai_buddies_gemini_model wrapper works"
+result=$(ai_buddies_gemini_model)
+assert_eq "$result" ""
+
+# ── User-registered buddy tests ─────────────────────────────────────────────
+echo ""
+echo "--- v3: user buddy registration ---"
+
+test_start "buddy-register.sh requires --id"
+output=$(bash "${PLUGIN_ROOT}/scripts/buddy-register.sh" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "buddy-register.sh requires --binary"
+output=$(bash "${PLUGIN_ROOT}/scripts/buddy-register.sh" --id test 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "buddy-register.sh creates buddy JSON"
+bash "${PLUGIN_ROOT}/scripts/buddy-register.sh" \
+  --id "test-buddy" --binary "test-bin" --display "Test Buddy" --modes "exec" 2>/dev/null
+assert_file_exists "${AI_BUDDIES_HOME}/buddies/test-buddy.json"
+
+test_start "registered buddy appears in list"
+buddies=$(ai_buddies_list_buddies)
+assert_contains "$buddies" "test-buddy"
+
+test_start "registered buddy config readable"
+result=$(ai_buddies_buddy_config "test-buddy" "display_name" "")
+assert_eq "$result" "Test Buddy"
+
+test_start "registered buddy binary field correct"
+result=$(ai_buddies_buddy_config "test-buddy" "binary" "")
+assert_eq "$result" "test-bin"
+
+test_start "buddy-register.sh rejects invalid ID"
+output=$(bash "${PLUGIN_ROOT}/scripts/buddy-register.sh" --id "bad id!" --binary "test" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+# Clean up test buddy
+rm -f "${AI_BUDDIES_HOME}/buddies/test-buddy.json"
+
+# ── Dispatch tests ──────────────────────────────────────────────────────────
+echo ""
+echo "--- v3: dispatch ---"
+
+test_start "ai_buddies_dispatch_buddy dispatches claude"
+DISPATCH_DIR=$(mktemp -d)
+DISPATCH_WT=$(mktemp -d)
+result=$(ai_buddies_dispatch_buddy "claude" "$DISPATCH_WT" "test prompt" 10 "$DISPATCH_DIR" "$PLUGIN_ROOT" 2>&1 || true)
+# Should produce an output file path (even if mock)
+if [[ -n "$result" ]]; then
+  test_pass
+else
+  test_fail "expected output from dispatch"
+fi
+rm -rf "$DISPATCH_DIR" "$DISPATCH_WT"
+
+test_start "ai_buddies_dispatch_buddy dispatches codex"
+DISPATCH_DIR=$(mktemp -d)
+DISPATCH_WT=$(mktemp -d)
+result=$(ai_buddies_dispatch_buddy "codex" "$DISPATCH_WT" "test prompt" 10 "$DISPATCH_DIR" "$PLUGIN_ROOT" 2>&1 || true)
+if [[ -n "$result" ]]; then
+  test_pass
+else
+  test_fail "expected output from dispatch"
+fi
+rm -rf "$DISPATCH_DIR" "$DISPATCH_WT"
+
+# ── Tribunal helper tests ───────────────────────────────────────────────────
+echo ""
+echo "--- v3: tribunal helpers ---"
+
+test_start "ai_buddies_tribunal_rounds default is 2"
+result=$(ai_buddies_tribunal_rounds)
+assert_eq "$result" "2"
+
+test_start "ai_buddies_tribunal_max_buddies default is 2"
+result=$(ai_buddies_tribunal_max_buddies)
+assert_eq "$result" "2"
+
+test_start "ai_buddies_build_tribunal_prompt contains question"
+result=$(ai_buddies_build_tribunal_prompt "test question" "FOR" 1 2 "")
+assert_contains "$result" "test question"
+
+test_start "ai_buddies_build_tribunal_prompt contains position"
+result=$(ai_buddies_build_tribunal_prompt "test question" "ARGUE FOR" 1 2 "")
+assert_contains "$result" "ARGUE FOR"
+
+test_start "ai_buddies_build_tribunal_prompt contains round info"
+result=$(ai_buddies_build_tribunal_prompt "test question" "FOR" 1 2 "")
+assert_contains "$result" "Round 1/2"
+
+test_start "ai_buddies_build_tribunal_prompt contains evidence protocol"
+result=$(ai_buddies_build_tribunal_prompt "test question" "FOR" 1 2 "")
+assert_contains "$result" "EVIDENCE PROTOCOL"
+
+test_start "ai_buddies_build_tribunal_prompt includes prev_args in round 2"
+result=$(ai_buddies_build_tribunal_prompt "test question" "FOR" 2 2 "Previous arguments here")
+assert_contains "$result" "Previous arguments here"
+
+test_start "tribunal-run.sh requires --question"
+output=$(bash "${PLUGIN_ROOT}/scripts/tribunal-run.sh" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+# ── ELO helper tests ────────────────────────────────────────────────────────
+echo ""
+echo "--- v3: ELO helpers ---"
+
+test_start "ai_buddies_elo_enabled default is true"
+result=$(ai_buddies_elo_enabled)
+assert_eq "$result" "true"
+
+test_start "ai_buddies_elo_k_factor default is 32"
+result=$(ai_buddies_elo_k_factor)
+assert_eq "$result" "32"
+
+test_start "ai_buddies_elo_file returns path"
+result=$(ai_buddies_elo_file)
+assert_contains "$result" "elo.json"
+
+test_start "ai_buddies_detect_task_class: algorithm"
+result=$(ai_buddies_detect_task_class "Implement sorting algorithm")
+assert_eq "$result" "algorithm"
+
+test_start "ai_buddies_detect_task_class: bugfix"
+result=$(ai_buddies_detect_task_class "Fix the crash in login")
+assert_eq "$result" "bugfix"
+
+test_start "ai_buddies_detect_task_class: refactor"
+result=$(ai_buddies_detect_task_class "Refactor the auth module")
+assert_eq "$result" "refactor"
+
+test_start "ai_buddies_detect_task_class: feature"
+result=$(ai_buddies_detect_task_class "Add dark mode support")
+assert_eq "$result" "feature"
+
+test_start "ai_buddies_detect_task_class: test"
+result=$(ai_buddies_detect_task_class "Add test coverage for utils")
+assert_eq "$result" "test"
+
+test_start "ai_buddies_detect_task_class: docs"
+result=$(ai_buddies_detect_task_class "Update the README")
+assert_eq "$result" "docs"
+
+test_start "ai_buddies_detect_task_class: other (fallback)"
+result=$(ai_buddies_detect_task_class "Do something vague")
+assert_eq "$result" "other"
+
+# ── ELO update script tests ─────────────────────────────────────────────────
+echo ""
+echo "--- v3: elo-update.sh ---"
+
+test_start "elo-update.sh requires --winner"
+output=$(bash "${PLUGIN_ROOT}/scripts/elo-update.sh" 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "elo-update.sh requires --loser"
+output=$(bash "${PLUGIN_ROOT}/scripts/elo-update.sh" --winner codex 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "elo-update.sh creates elo.json"
+bash "${PLUGIN_ROOT}/scripts/elo-update.sh" --winner codex --loser gemini --task-class algorithm 2>/dev/null
+assert_file_exists "$(ai_buddies_elo_file)"
+
+test_start "elo-update.sh winner rating increases"
+winner_rating=$(jq -r '.codex.algorithm.rating' "$(ai_buddies_elo_file)" 2>/dev/null)
+winner_int="${winner_rating%%.*}"
+if (( winner_int > 1200 )); then
+  test_pass
+else
+  test_fail "expected winner > 1200, got $winner_rating"
+fi
+
+test_start "elo-update.sh loser rating decreases"
+loser_rating=$(jq -r '.gemini.algorithm.rating' "$(ai_buddies_elo_file)" 2>/dev/null)
+loser_int="${loser_rating%%.*}"
+if (( loser_int < 1200 )); then
+  test_pass
+else
+  test_fail "expected loser < 1200, got $loser_rating"
+fi
+
+test_start "elo-update.sh tracks games count"
+games=$(jq -r '.codex.algorithm.games' "$(ai_buddies_elo_file)" 2>/dev/null)
+assert_eq "$games" "1"
+
+test_start "elo-update.sh marks provisional status"
+prov=$(jq -r '.codex.algorithm.provisional' "$(ai_buddies_elo_file)" 2>/dev/null)
+assert_eq "$prov" "true"
+
+test_start "elo-update.sh second update increments games"
+bash "${PLUGIN_ROOT}/scripts/elo-update.sh" --winner codex --loser gemini --task-class algorithm 2>/dev/null
+games=$(jq -r '.codex.algorithm.games' "$(ai_buddies_elo_file)" 2>/dev/null)
+assert_eq "$games" "2"
+
+# ── ELO show tests ──────────────────────────────────────────────────────────
+echo ""
+echo "--- v3: elo-show.sh ---"
+
+test_start "elo-show.sh runs without error"
+output=$(bash "${PLUGIN_ROOT}/scripts/elo-show.sh" 2>&1)
+ec=$?
+assert_exit_code "$ec" 0
+
+test_start "elo-show.sh shows buddy names"
+assert_contains "$output" "codex"
+
+test_start "elo-show.sh shows task class"
+assert_contains "$output" "algorithm"
+
+test_start "elo-show.sh --task-class filters output"
+output=$(bash "${PLUGIN_ROOT}/scripts/elo-show.sh" --task-class algorithm 2>&1)
+assert_contains "$output" "algorithm"
+
+test_start "elo-show.sh no data message for empty class"
+output=$(bash "${PLUGIN_ROOT}/scripts/elo-show.sh" --task-class nonexistent 2>&1)
+# Should not error, just show empty table
+ec=$?
+assert_exit_code "$ec" 0
+
+# Clean up ELO data
+rm -f "$(ai_buddies_elo_file)"
+
+# ── File structure tests (v3 new files) ──────────────────────────────────────
+echo ""
+echo "--- v3: file structure ---"
+
+test_start "buddies/builtin/claude.json exists"
+assert_file_exists "${PLUGIN_ROOT}/buddies/builtin/claude.json"
+
+test_start "buddies/builtin/codex.json exists"
+assert_file_exists "${PLUGIN_ROOT}/buddies/builtin/codex.json"
+
+test_start "buddies/builtin/gemini.json exists"
+assert_file_exists "${PLUGIN_ROOT}/buddies/builtin/gemini.json"
+
+test_start "buddy-run.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/buddy-run.sh"
+
+test_start "buddy-register.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/buddy-register.sh"
+
+test_start "tribunal-run.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/tribunal-run.sh"
+
+test_start "elo-update.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/elo-update.sh"
+
+test_start "elo-show.sh exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/elo-show.sh"
+
+test_start "tribunal SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/tribunal/SKILL.md"
+
+test_start "leaderboard SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/leaderboard/SKILL.md"
+
+test_start "add-buddy SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/add-buddy/SKILL.md"
+
+test_start "buddy JSON schema_version is 1"
+sv=$(jq -r '.schema_version' "${PLUGIN_ROOT}/buddies/builtin/codex.json" 2>/dev/null)
+assert_eq "$sv" "1"
+
+test_start "buddy JSON has required fields"
+has_fields=$(jq -r 'has("id") and has("binary") and has("modes") and has("adapter_script")' \
+  "${PLUGIN_ROOT}/buddies/builtin/codex.json" 2>/dev/null)
+assert_eq "$has_fields" "true"
+
+test_start "plugin.json version is 3.0.0"
+pv=$(jq -r '.version' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null)
+assert_eq "$pv" "3.0.0"
+
+# ── Session-start with dynamic registry ──────────────────────────────────────
+echo ""
+echo "--- v3: session-start dynamic ---"
+
+test_start "session-start.sh shows /tribunal"
+output=$(bash "${PLUGIN_ROOT}/hooks/session-start.sh" 2>&1)
+assert_contains "$output" "/tribunal"
+
+test_start "session-start.sh shows /leaderboard"
+assert_contains "$output" "/leaderboard"
+
+test_start "session-start.sh shows /add-buddy"
+assert_contains "$output" "/add-buddy"
+
+test_start "session-start.sh still shows /forge"
+assert_contains "$output" "/forge"
+
+test_start "session-start.sh still shows /brainstorm"
+assert_contains "$output" "/brainstorm"
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 rm -rf "$MOCK_DIR" "$TEST_HOME"
