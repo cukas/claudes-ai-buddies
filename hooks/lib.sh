@@ -862,8 +862,19 @@ ai_buddies_build_tribunal_prompt() {
   case "$mode" in
     socratic)
       _ai_buddies_build_socratic_prompt "$question" "$position" "$round" "$total" "$prev_args"
-      return
-      ;;
+      return ;;
+    steelman)
+      _ai_buddies_build_steelman_prompt "$question" "$position" "$round" "$total" "$prev_args"
+      return ;;
+    red-team)
+      _ai_buddies_build_redteam_prompt "$question" "$position" "$round" "$total" "$prev_args"
+      return ;;
+    synthesis)
+      _ai_buddies_build_synthesis_prompt "$question" "$position" "$round" "$total" "$prev_args"
+      return ;;
+    postmortem)
+      _ai_buddies_build_postmortem_prompt "$question" "$position" "$round" "$total" "$prev_args"
+      return ;;
     *)
       prompt="ADVERSARIAL DEBATE — Round ${round}/${total}"
       ;;
@@ -946,6 +957,182 @@ _ai_buddies_build_socratic_prompt() {
     prompt+=$'\n'"- Use answer_status = ANSWERED or UNANSWERABLE."
     prompt+=$'\n'"- If UNANSWERABLE, set file, lines, and evidence to null and explain what evidence is missing."
     prompt+=$'\n'"- deeper_question may be null if no deeper question is justified."
+  fi
+
+  printf '%s' "$prompt"
+}
+
+# ── Build Steelman tribunal prompt ──────────────────────────────────────────
+_ai_buddies_build_steelman_prompt() {
+  local question="$1"
+  local position="$2"
+  local round="$3"
+  local total="$4"
+  local prev_args="${5:-}"
+
+  local prompt="STEELMAN DEBATE — Round ${round}/${total}"
+  prompt+=$'\n\n'"QUESTION: ${question}"
+  prompt+=$'\n'"ROLE: ${position}"
+
+  if [[ "$round" -eq 1 || -z "$prev_args" ]]; then
+    prompt+=$'\n\n'"TASK: Build the STRONGEST possible case for your assigned position, even if you personally disagree."
+    prompt+=$'\n'"A steelman is the opposite of a strawman — you present the most charitable, rigorous, well-evidenced version of the argument."
+    prompt+=$'\n\n'"Return a JSON array only. No markdown, no code fences, no prose."
+    prompt+=$'\n'"Schema:"
+    prompt+=$'\n'"["
+    prompt+=$'\n'"  {"
+    prompt+=$'\n'"    \"claim\": \"The strongest argument for this position\","
+    prompt+=$'\n'"    \"file\": \"path/to/file.ts\","
+    prompt+=$'\n'"    \"lines\": \"N-M\","
+    prompt+=$'\n'"    \"evidence\": \"quoted code that supports this claim\","
+    prompt+=$'\n'"    \"severity\": 1-5,"
+    prompt+=$'\n'"    \"why_strongest\": \"Why this is the best version of this argument, not a weak strawman\","
+    prompt+=$'\n'"    \"concession\": \"What the opposing side is legitimately right about that this claim does not address\""
+    prompt+=$'\n'"  }"
+    prompt+=$'\n'"]"
+    prompt+=$'\n\n'"Rules:"
+    prompt+=$'\n'"- Find genuine merit, not obvious points."
+    prompt+=$'\n'"- Every claim MUST include a concession — what the other side is right about. This is what makes it a steelman, not a debate."
+    prompt+=$'\n'"- If you cannot find strong evidence, return an empty array []."
+    prompt+=$'\n'"- Quality over quantity — 2 strong claims beat 5 weak ones."
+  else
+    prompt+=$'\n\n'"PREVIOUS ROUND STEELMAN ARGUMENTS:"
+    prompt+=$'\n'"${prev_args}"
+    prompt+=$'\n\n'"TASK: Challenge the other steelman. Find where even the strongest version has weaknesses."
+    prompt+=$'\n'"Same JSON schema as before. Reference specific claims from the previous round."
+  fi
+
+  printf '%s' "$prompt"
+}
+
+# ── Build Red-team tribunal prompt ─────────────────────────────────────────
+_ai_buddies_build_redteam_prompt() {
+  local question="$1"
+  local position="$2"
+  local round="$3"
+  local total="$4"
+  local prev_args="${5:-}"
+
+  local prompt="RED-TEAM ASSESSMENT — Round ${round}/${total}"
+  prompt+=$'\n\n'"TARGET: ${question}"
+  prompt+=$'\n'"ROLE: ${position}"
+
+  if [[ "$round" -eq 1 ]]; then
+    prompt+=$'\n\n'"TASK: Attack this proposal from your assigned angle. Find every vulnerability, weakness, edge case, and failure mode."
+    prompt+=$'\n'"Be thorough and adversarial. You are a hostile auditor."
+    prompt+=$'\n\n'"Return a JSON array only. No markdown, no code fences, no prose."
+    prompt+=$'\n'"Schema:"
+    prompt+=$'\n'"["
+    prompt+=$'\n'"  {"
+    prompt+=$'\n'"    \"vulnerability\": \"Description of the weakness\","
+    prompt+=$'\n'"    \"attack_type\": \"reliability|security|performance|maintainability\","
+    prompt+=$'\n'"    \"file\": \"path/to/file.ts\","
+    prompt+=$'\n'"    \"lines\": \"N-M\","
+    prompt+=$'\n'"    \"evidence\": \"quoted code showing the weakness\","
+    prompt+=$'\n'"    \"severity\": 1-5,"
+    prompt+=$'\n'"    \"exploit_scenario\": \"How this could be exploited or cause failure\""
+    prompt+=$'\n'"  }"
+    prompt+=$'\n'"]"
+    prompt+=$'\n\n'"Rules:"
+    prompt+=$'\n'"- Do not defend the proposal. Only attack."
+    prompt+=$'\n'"- Every finding must have code evidence."
+    prompt+=$'\n'"- Focus on your assigned attack vector."
+  else
+    prompt+=$'\n\n'"OTHER ATTACKER'S FINDINGS:"
+    prompt+=$'\n'"${prev_args}"
+    prompt+=$'\n\n'"TASK: Find ADDITIONAL vulnerabilities the other attacker missed. Chain attacks: combine findings for compound vulnerabilities."
+    prompt+=$'\n'"Same JSON schema. Do not repeat findings already listed above."
+  fi
+
+  printf '%s' "$prompt"
+}
+
+# ── Build Synthesis tribunal prompt ────────────────────────────────────────
+_ai_buddies_build_synthesis_prompt() {
+  local question="$1"
+  local position="$2"
+  local round="$3"
+  local total="$4"
+  local prev_args="${5:-}"
+
+  local prompt="SYNTHESIS SESSION — Round ${round}/${total}"
+  prompt+=$'\n\n'"PROBLEM: ${question}"
+  prompt+=$'\n'"ROLE: ${position}"
+
+  if [[ "$round" -eq 1 ]]; then
+    prompt+=$'\n\n'"TASK: Propose a complete solution. Be specific — files to change, architecture decisions, trade-offs."
+    prompt+=$'\n\n'"Return a JSON object only. No markdown, no code fences, no prose."
+    prompt+=$'\n'"Schema:"
+    prompt+=$'\n'"{"
+    prompt+=$'\n'"  \"approach_name\": \"Short name for this approach\","
+    prompt+=$'\n'"  \"summary\": \"2-3 sentence description\","
+    prompt+=$'\n'"  \"changes\": ["
+    prompt+=$'\n'"    {\"file\": \"path\", \"lines\": \"N-M\", \"change\": \"what to do and why\"}"
+    prompt+=$'\n'"  ],"
+    prompt+=$'\n'"  \"trade_offs\": \"What this approach sacrifices\","
+    prompt+=$'\n'"  \"complexity\": \"LOW|MEDIUM|HIGH\","
+    prompt+=$'\n'"  \"strengths\": \"What this approach does best\""
+    prompt+=$'\n'"}"
+    prompt+=$'\n\n'"Rules:"
+    prompt+=$'\n'"- Be concrete. Abstract proposals score zero."
+    prompt+=$'\n'"- Reference actual code, not hypothetical files."
+    prompt+=$'\n'"- State trade-offs honestly."
+  else
+    prompt+=$'\n\n'"OTHER PROPOSAL:"
+    prompt+=$'\n'"${prev_args}"
+    prompt+=$'\n\n'"TASK: Create a HYBRID solution. Take the best parts of both proposals. Explain what you take from each and why."
+    prompt+=$'\n\n'"Schema:"
+    prompt+=$'\n'"{"
+    prompt+=$'\n'"  \"hybrid_name\": \"Short name\","
+    prompt+=$'\n'"  \"take_from_own\": \"What to keep from your proposal and why\","
+    prompt+=$'\n'"  \"take_from_other\": \"What to take from the other proposal and why\","
+    prompt+=$'\n'"  \"changes\": [{\"file\": \"path\", \"lines\": \"N-M\", \"change\": \"what to do\"}],"
+    prompt+=$'\n'"  \"trade_offs\": \"What the hybrid sacrifices\","
+    prompt+=$'\n'"  \"why_better\": \"Why this hybrid beats either proposal alone\""
+    prompt+=$'\n'"}"
+  fi
+
+  printf '%s' "$prompt"
+}
+
+# ── Build Postmortem tribunal prompt ───────────────────────────────────────
+_ai_buddies_build_postmortem_prompt() {
+  local question="$1"
+  local position="$2"
+  local round="$3"
+  local total="$4"
+  local prev_args="${5:-}"
+
+  local prompt="POSTMORTEM INVESTIGATION — Round ${round}/${total}"
+  prompt+=$'\n\n'"INCIDENT: ${question}"
+  prompt+=$'\n'"ROLE: ${position}"
+
+  if [[ "$round" -eq 1 ]]; then
+    prompt+=$'\n\n'"TASK: Investigate this failure from your assigned angle. Build a timeline of what went wrong."
+    prompt+=$'\n\n'"Return a JSON array only. No markdown, no code fences, no prose."
+    prompt+=$'\n'"Schema:"
+    prompt+=$'\n'"["
+    prompt+=$'\n'"  {"
+    prompt+=$'\n'"    \"finding_id\": \"F1\","
+    prompt+=$'\n'"    \"category\": \"execution|config|dependency|external\","
+    prompt+=$'\n'"    \"finding\": \"What went wrong\","
+    prompt+=$'\n'"    \"file\": \"path/to/file.ts\","
+    prompt+=$'\n'"    \"lines\": \"N-M\","
+    prompt+=$'\n'"    \"evidence\": \"quoted code or config showing the issue\","
+    prompt+=$'\n'"    \"timeline_order\": 1,"
+    prompt+=$'\n'"    \"is_root_cause\": false,"
+    prompt+=$'\n'"    \"is_contributing_factor\": true"
+    prompt+=$'\n'"  }"
+    prompt+=$'\n'"]"
+    prompt+=$'\n\n'"Rules:"
+    prompt+=$'\n'"- Stay in your investigation lane (execution vs environment)."
+    prompt+=$'\n'"- Build a chronological timeline."
+    prompt+=$'\n'"- Mark exactly one finding as potential root cause if you find it."
+  else
+    prompt+=$'\n\n'"OTHER INVESTIGATOR'S FINDINGS:"
+    prompt+=$'\n'"${prev_args}"
+    prompt+=$'\n\n'"TASK: Cross-reference with your findings. Where do the timelines connect? Identify the root cause by combining both perspectives."
+    prompt+=$'\n'"Same JSON schema, with one addition: include a \"cross_references\" field (array of finding_ids from the other investigator that relate to this finding)."
   fi
 
   printf '%s' "$prompt"

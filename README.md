@@ -41,7 +41,11 @@ claude plugin install claudes-ai-buddies@cukas
 | `/brainstorm "task"` | Confidence bid — available buddies assess the task, you pick who builds it |
 | `/forge "task" --fitness "cmd"` | Competitive build with automated scoring |
 | `/tribunal "question"` | Adversarial debate — two buddies argue with evidence, Claude judges |
-| `/tribunal --socratic "question"` | Socratic inquiry — buddies probe assumptions with evidence, Claude synthesizes |
+| `/tribunal --socratic "question"` | Socratic inquiry — probe assumptions, Claude synthesizes |
+| `/tribunal --steelman "question"` | Steelman — each argues the other side's strongest case |
+| `/tribunal --red-team "question"` | Red-team — attack from multiple angles, no defense |
+| `/tribunal --synthesis "question"` | Synthesis — propose solutions, then hybridize |
+| `/tribunal --postmortem "question"` | Postmortem — investigate failure from different angles |
 | `/leaderboard` | Show ELO ratings from forge competitions |
 | `/add-buddy` | Register any CLI as a new buddy |
 | `/codex "prompt"` | Ask Codex anything — delegate, brainstorm, second opinion |
@@ -129,30 +133,27 @@ ELO updated: Gemini 1200→1216, Claude 1200→1184, Codex 1200→1184
 
 ---
 
-## Tribunal — Adversarial Debate & Socratic Inquiry
+## Tribunal — 6 Debate Modes
 
-Two modes for different situations:
-
-**Adversarial** (default) — binary decisions:
 ```
-/tribunal "Should we refactor the auth middleware to use async/await?"
-```
-
-**Socratic** — open exploration:
-```
-/tribunal --socratic "Is our error handling strategy resilient enough?"
-/tribunal --socratic "What should we consider before migrating to a monorepo?"
+/tribunal "Should we refactor auth?"                      # adversarial (default)
+/tribunal --socratic "Is our error handling resilient?"    # probe assumptions
+/tribunal --steelman "Should we use microservices?"        # argue other side's best case
+/tribunal --red-team "Review our payment flow"             # attack from all angles
+/tribunal --synthesis "How to restructure the data layer?" # propose + hybridize
+/tribunal --postmortem "Why did the deploy fail?"          # investigate failure
 ```
 
-| | Adversarial | Socratic |
-|---|---|---|
-| **AIs do** | Argue FOR vs AGAINST | Probe assumptions with questions |
-| **Claude does** | Judge — picks winner by evidence score | Synthesize — surfaces exposed assumptions |
-| **Best for** | Binary decisions (should/shouldn't) | Open exploration, architecture, bug investigation |
-| **Output** | Winner + evidence scorecards | Assumptions exposed + open questions + next steps |
+| Mode | AIs do | Claude does | Best for |
+|------|--------|-------------|----------|
+| **adversarial** | FOR vs AGAINST | Judge — picks winner | Binary decisions |
+| **socratic** | Probe assumptions | Synthesize insights | Early exploration |
+| **steelman** | Argue other side's best case | Calibrate true strength | Avoiding bias |
+| **red-team** | Attack, no defense | Prioritize risks | Poking holes |
+| **synthesis** | Propose, then hybridize | Evaluate + merge | Finding a third option |
+| **postmortem** | Investigate from different angles | Build timeline + root cause | Bug investigation |
 
-- **Evidence protocol** — every claim/question requires `{file, lines, evidence}`. No evidence = score zero
-- **Cross-examination** — configurable rounds (adversarial: rebuttals, Socratic: cross-answers)
+- **Evidence protocol** — every claim requires `{file, lines, evidence}`. No evidence = score zero
 - **Auto-triggered** — fires on forge close calls or review disagreements
 
 ---

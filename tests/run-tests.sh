@@ -1633,6 +1633,84 @@ test_start "tribunal-run.sh requires --question"
 output=$(bash "${PLUGIN_ROOT}/scripts/tribunal-run.sh" 2>&1 || true)
 assert_contains "$output" "ERROR"
 
+# ── v3.1: multi-mode tribunal tests ─────────────────────────────────────────
+echo ""
+echo "--- v3.1: tribunal multi-mode ---"
+
+test_start "ai_buddies_build_tribunal_prompt default mode is adversarial"
+result=$(ai_buddies_build_tribunal_prompt "test" "FOR" 1 2 "")
+assert_contains "$result" "ADVERSARIAL DEBATE"
+
+test_start "ai_buddies_build_tribunal_prompt socratic mode"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 1 2 "" "socratic")
+assert_contains "$result" "SOCRATIC INQUIRY"
+
+test_start "ai_buddies_build_tribunal_prompt steelman mode"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 1 2 "" "steelman")
+assert_contains "$result" "STEELMAN DEBATE"
+
+test_start "ai_buddies_build_tribunal_prompt red-team mode"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 1 2 "" "red-team")
+assert_contains "$result" "RED-TEAM ASSESSMENT"
+
+test_start "ai_buddies_build_tribunal_prompt synthesis mode"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 1 2 "" "synthesis")
+assert_contains "$result" "SYNTHESIS SESSION"
+
+test_start "ai_buddies_build_tribunal_prompt postmortem mode"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 1 2 "" "postmortem")
+assert_contains "$result" "POSTMORTEM INVESTIGATION"
+
+test_start "socratic round 2 contains QUESTIONS section"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 2 2 "some questions" "socratic")
+assert_contains "$result" "QUESTIONS:"
+
+test_start "steelman round 2 contains PREVIOUS ROUND"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 2 2 "some args" "steelman")
+assert_contains "$result" "PREVIOUS ROUND"
+
+test_start "red-team round 2 contains OTHER ATTACKER"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 2 2 "findings" "red-team")
+assert_contains "$result" "OTHER ATTACKER"
+
+test_start "synthesis round 2 contains OTHER PROPOSAL"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 2 2 "proposal" "synthesis")
+assert_contains "$result" "OTHER PROPOSAL"
+
+test_start "postmortem round 2 contains OTHER INVESTIGATOR"
+result=$(ai_buddies_build_tribunal_prompt "test" "ROLE" 2 2 "findings" "postmortem")
+assert_contains "$result" "OTHER INVESTIGATOR"
+
+test_start "tribunal-run.sh rejects invalid mode"
+output=$(bash "${PLUGIN_ROOT}/scripts/tribunal-run.sh" --question "test" --cwd /tmp --mode invalid 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "tribunal-run.sh rejects socratic with 3 rounds"
+output=$(bash "${PLUGIN_ROOT}/scripts/tribunal-run.sh" --question "test" --cwd /tmp --mode socratic --rounds 3 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "tribunal-run.sh rejects red-team with 3 rounds"
+output=$(bash "${PLUGIN_ROOT}/scripts/tribunal-run.sh" --question "test" --cwd /tmp --mode red-team --rounds 3 2>&1 || true)
+assert_contains "$output" "ERROR"
+
+test_start "mode doc exists: adversarial.md"
+[[ -f "${PLUGIN_ROOT}/skills/tribunal/modes/adversarial.md" ]] && assert_eq "true" "true" || assert_eq "false" "true"
+
+test_start "mode doc exists: socratic.md"
+[[ -f "${PLUGIN_ROOT}/skills/tribunal/modes/socratic.md" ]] && assert_eq "true" "true" || assert_eq "false" "true"
+
+test_start "mode doc exists: steelman.md"
+[[ -f "${PLUGIN_ROOT}/skills/tribunal/modes/steelman.md" ]] && assert_eq "true" "true" || assert_eq "false" "true"
+
+test_start "mode doc exists: red-team.md"
+[[ -f "${PLUGIN_ROOT}/skills/tribunal/modes/red-team.md" ]] && assert_eq "true" "true" || assert_eq "false" "true"
+
+test_start "mode doc exists: synthesis.md"
+[[ -f "${PLUGIN_ROOT}/skills/tribunal/modes/synthesis.md" ]] && assert_eq "true" "true" || assert_eq "false" "true"
+
+test_start "mode doc exists: postmortem.md"
+[[ -f "${PLUGIN_ROOT}/skills/tribunal/modes/postmortem.md" ]] && assert_eq "true" "true" || assert_eq "false" "true"
+
 # ── ELO helper tests ────────────────────────────────────────────────────────
 echo ""
 echo "--- v3: ELO helpers ---"

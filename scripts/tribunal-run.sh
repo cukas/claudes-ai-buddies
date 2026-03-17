@@ -28,12 +28,16 @@ while [[ $# -gt 0 ]]; do
     --timeout)  TIMEOUT="$2";     shift 2 ;;
     --mode)
       case "$2" in
-        adversarial|socratic) MODE="$2" ;;
-        *) echo "ERROR: --mode must be adversarial or socratic (got: $2)" >&2; exit 1 ;;
+        adversarial|socratic|steelman|red-team|synthesis|postmortem) MODE="$2" ;;
+        *) echo "ERROR: --mode must be one of: adversarial, socratic, steelman, red-team, synthesis, postmortem (got: $2)" >&2; exit 1 ;;
       esac
       shift 2
       ;;
-    --socratic) MODE="socratic"; shift 1 ;;
+    --socratic)   MODE="socratic";   shift 1 ;;
+    --steelman)   MODE="steelman";   shift 1 ;;
+    --red-team)   MODE="red-team";   shift 1 ;;
+    --synthesis)  MODE="synthesis";  shift 1 ;;
+    --postmortem) MODE="postmortem"; shift 1 ;;
     *)
       echo "ERROR: Unknown argument: $1" >&2
       exit 1
@@ -44,11 +48,15 @@ done
 [[ -z "$QUESTION" ]] && { echo "ERROR: --question is required" >&2; exit 1; }
 [[ -d "$CWD" ]]      || { echo "ERROR: --cwd '$CWD' does not exist" >&2; exit 1; }
 
-# Socratic mode is a fixed 2-round protocol (round 1 asks, round 2 answers)
-if [[ "$MODE" == "socratic" && "$ROUNDS" -ne 2 ]]; then
-  echo "ERROR: socratic mode requires exactly 2 rounds (round 1 asks, round 2 answers)" >&2
-  exit 1
-fi
+# Modes with fixed 2-round protocols
+case "$MODE" in
+  socratic|red-team|synthesis|postmortem)
+    if [[ "$ROUNDS" -ne 2 ]]; then
+      echo "ERROR: ${MODE} mode requires exactly 2 rounds" >&2
+      exit 1
+    fi
+    ;;
+esac
 
 ai_buddies_debug "tribunal-run: question=$QUESTION, rounds=$ROUNDS, max_buddies=$MAX_BUDDIES, mode=$MODE"
 
@@ -119,6 +127,37 @@ case "$MODE" in
     POSITIONS+=("IMPLICATIONS QUESTIONER — Ask VIEWPOINT, CONSEQUENCE, and META questions. Challenge perspectives, explore what follows, and question whether this is the right question.")
     for i in $(seq 2 $((${#DEBATERS[@]} - 1))); do
       POSITIONS+=("WILD-CARD QUESTIONER — Ask any type of probing question. Look for what the other questioners missed — edge cases, historical context, alternative framings.")
+    done
+    ;;
+  steelman)
+    POSITIONS+=("STEELMAN THE AFFIRMATIVE — Build the strongest possible case FOR this. Find genuine merit, not obvious points. Present the most charitable, rigorous version of the argument.")
+    POSITIONS+=("STEELMAN THE NEGATIVE — Build the strongest possible case AGAINST this. Find genuine concerns, not strawmen. Present the most rigorous version of the opposing argument.")
+    for i in $(seq 2 $((${#DEBATERS[@]} - 1))); do
+      if (( i % 2 == 0 )); then
+        POSITIONS+=("STEELMAN THE AFFIRMATIVE (additional perspective): Find further genuine merit, especially non-obvious benefits.")
+      else
+        POSITIONS+=("STEELMAN THE NEGATIVE (additional perspective): Find further genuine concerns, especially non-obvious risks.")
+      fi
+    done
+    ;;
+  red-team)
+    POSITIONS+=("ATTACK VECTOR: RELIABILITY & CORRECTNESS — Find bugs, race conditions, edge cases, data corruption risks, failure modes. Every weakness in correctness.")
+    POSITIONS+=("ATTACK VECTOR: SECURITY & PERFORMANCE — Find vulnerabilities, injection points, resource leaks, bottlenecks, scaling issues. Every weakness in security and performance.")
+    for i in $(seq 2 $((${#DEBATERS[@]} - 1))); do
+      POSITIONS+=("ATTACK VECTOR: MAINTAINABILITY & DX — Find code smells, coupling issues, missing abstractions, documentation gaps. Every weakness in long-term maintenance.")
+    done
+    ;;
+  synthesis)
+    # Synthesis is a 2-party protocol (propose + hybridize). Cap at 2 debaters.
+    DEBATERS=("${DEBATERS[@]:0:2}")
+    POSITIONS+=("PROPOSAL A — Propose your preferred solution. Be specific: files to change, architecture, trade-offs. This is your strongest independent recommendation.")
+    POSITIONS+=("PROPOSAL B — Propose a DIFFERENT solution. Look for unconventional or less obvious approaches. Be specific: files to change, architecture, trade-offs.")
+    ;;
+  postmortem)
+    POSITIONS+=("EXECUTION INVESTIGATOR — Trace the code execution path. What functions were called? What state was mutated? Where did logic diverge from expected behavior? Build a timeline from code.")
+    POSITIONS+=("ENVIRONMENT INVESTIGATOR — Trace configuration, deployment, dependencies, and external factors. What changed recently? What assumptions about the environment are wrong?")
+    for i in $(seq 2 $((${#DEBATERS[@]} - 1))); do
+      POSITIONS+=("DEPENDENCY INVESTIGATOR — Trace third-party libraries, API contracts, and upstream/downstream services. What external changes could have caused this?")
     done
     ;;
   *)
