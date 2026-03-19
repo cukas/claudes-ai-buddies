@@ -82,6 +82,6 @@ If the binary isn't found:
 ## Rules
 
 - **ID must be alphanumeric** (plus hyphens/underscores). Reject anything else.
-- **Don't overwrite builtin buddies** (claude, codex, gemini). Warn and ask for a different ID.
+- **Don't overwrite builtin buddies** (claude, codex, gemini, opencode). Warn and ask for a different ID.
 - **Test the binary** after registration. Report found/not-found status.
 - **Never pass secrets** in registration.

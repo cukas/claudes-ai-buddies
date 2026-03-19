@@ -13,6 +13,8 @@ description: Reference for Claude's AI Buddies plugin
 | `/codex-review` | Codex | Code review via Codex (uncommitted, branch, commit) |
 | `/gemini "prompt"` | Gemini | Ask Gemini anything — brainstorm, delegate, second opinion |
 | `/gemini-review` | Gemini | Code review via Gemini (uncommitted, branch, commit) |
+| `/opencode "prompt"` | OpenCode | Ask OpenCode anything — multi-provider, configurable model |
+| `/opencode-review` | OpenCode | Code review via OpenCode (uncommitted, branch, commit) |
 | `/brainstorm "topic"` | All | Multi-AI roundtable — all available buddies assess the task |
 | `/forge "task" --fitness "cmd"` | All | Competitive build — buddies build, automated scoring picks winner |
 | `/tribunal "question"` | 2+ | Adversarial debate — FOR vs AGAINST with evidence |
@@ -27,7 +29,7 @@ description: Reference for Claude's AI Buddies plugin
 
 ## Dynamic Buddy Registry (v3)
 
-Any CLI-based AI tool can become a buddy. Builtin buddies (Claude, Codex, Gemini) are auto-detected. Register custom buddies with `/add-buddy`:
+Any CLI-based AI tool can become a buddy. Builtin buddies (Claude, Codex, Gemini, OpenCode) are auto-detected. Register custom buddies with `/add-buddy`:
 
 ```bash
 /add-buddy --id aider --binary aider --display "Aider" --modes exec
@@ -56,9 +58,11 @@ Config file: `~/.claudes-ai-buddies/config.json`
 | `codex_model` | *(CLI default)* | Override Codex model |
 | `gemini_model` | *(CLI default)* | Override Gemini model |
 | `claude_model` | *(CLI default)* | Override Claude model |
+| `opencode_model` | `opencode/minimax-m2.5-free` | Override OpenCode model (format: `provider/model`) |
 | `codex_path` | *(auto-detected)* | Explicit path to codex binary |
 | `gemini_path` | *(auto-detected)* | Explicit path to gemini binary |
 | `claude_path` | *(auto-detected)* | Explicit path to claude binary |
+| `opencode_path` | *(auto-detected)* | Explicit path to opencode binary |
 
 ### Forge
 
@@ -107,13 +111,16 @@ Config file: `~/.claudes-ai-buddies/config.json`
 /codex-review branch:main            # diff from main to HEAD
 /gemini-review                       # uncommitted changes (Gemini)
 /gemini-review commit:abc1234        # specific commit
+/opencode-review                     # uncommitted changes (OpenCode)
+/opencode-review branch:feature      # diff from branch to HEAD
 ```
 
 ## Requirements
 
 - **Codex CLI** v0.100.0+ (`npm install -g @openai/codex`)
 - **Gemini CLI** v0.30.0+ (`npm install -g @google/gemini-cli`)
-- **Auth** — `codex auth login` / `gemini auth login` (or API key env vars)
+- **OpenCode CLI** v1.2.0+ (`brew install opencode`)
+- **Auth** — `codex auth login` / `gemini auth login` / `opencode providers login` (or API key env vars)
 - **jq** (required for registry, ELO, tribunal)
 - **git** (required for review skills, forge, tribunal)
 

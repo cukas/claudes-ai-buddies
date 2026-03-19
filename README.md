@@ -18,10 +18,12 @@
 # 1. Install the engines you want (one or more)
 npm install -g @openai/codex        # OpenAI Codex
 npm install -g @google/gemini-cli   # Google Gemini
+brew install opencode               # OpenCode (MiniMax, Anthropic, Google, etc.)
 
 # 2. Authenticate
 codex auth login                    # uses your OpenAI account
 gemini auth login                   # uses your Google account
+opencode providers login            # optional — pick a provider (works without for free model)
 
 # 3. Add the marketplace & install
 claude plugin marketplace add cukas/claudes-ai-buddies
@@ -30,7 +32,7 @@ claude plugin install claudes-ai-buddies@cukas
 # Done — start a new Claude Code session
 ```
 
-> Works with just Codex, just Gemini, both, or any custom AI CLI you register.
+> Works with any combination of Codex, Gemini, OpenCode, or any custom AI CLI you register.
 
 ---
 
@@ -45,8 +47,10 @@ claude plugin install claudes-ai-buddies@cukas
 | `/add-buddy` | Register any CLI as a new buddy |
 | `/codex "prompt"` | Ask Codex anything — delegate, brainstorm, second opinion |
 | `/gemini "prompt"` | Ask Gemini anything — different model, different perspective |
+| `/opencode "prompt"` | Ask OpenCode anything — multi-provider, configurable model |
 | `/codex-review` | Code review via Codex (uncommitted, branch, or commit) |
 | `/gemini-review` | Code review via Gemini (uncommitted, branch, or commit) |
+| `/opencode-review` | Code review via OpenCode (uncommitted, branch, or commit) |
 | `/buddy-help` | Full reference, config, troubleshooting |
 
 ---
@@ -178,12 +182,14 @@ Persistent ELO ratings tracked per task class (algorithm, bugfix, refactor, feat
 ```
 /codex "What's the best way to implement a rate limiter in Go?"
 /gemini "Debug this: TypeError: Cannot read property 'map' of undefined"
+/opencode "Review this architecture for scaling issues"
 ```
 
 **Code reviews:**
 ```
 /codex-review                                          # review uncommitted changes
 /gemini-review                                         # review uncommitted changes
+/opencode-review                                       # review uncommitted changes
 /codex-review branch:main "focus on security"          # review branch diff with focus
 ```
 
@@ -215,6 +221,7 @@ Optional — works out of the box. Config at `~/.claudes-ai-buddies/config.json`
 |-----|---------|-------------|
 | `codex_model` | *CLI default* | Codex model override |
 | `gemini_model` | *CLI default* | Gemini model override |
+| `opencode_model` | `opencode/minimax-m2.5-free` | OpenCode model (format: `provider/model`) |
 | `timeout` | `120` | Max seconds per call (forge uses 600s) |
 | `sandbox` | `full-auto` | `full-auto` or `suggest` |
 | `debug` | `false` | Enable debug logging |

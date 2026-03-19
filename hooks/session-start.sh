@@ -37,6 +37,7 @@ if [[ ${#engines[@]} -eq 0 ]]; then
 [AI Buddies] No peer AI CLIs found.
 Install Codex: npm install -g @openai/codex
 Install Gemini: npm install -g @google/gemini-cli
+Install OpenCode: brew install opencode
 </user-prompt-submit-hook>
 BANNER
   ai_buddies_debug "no AI CLIs found"
@@ -57,6 +58,11 @@ for id in "${buddy_ids[@]}"; do
     gemini)
       [[ -n "$skills" ]] && skills="${skills}, "
       skills="${skills}/gemini, /gemini-review"
+      has_peer=true
+      ;;
+    opencode)
+      [[ -n "$skills" ]] && skills="${skills}, "
+      skills="${skills}/opencode, /opencode-review"
       has_peer=true
       ;;
     *)

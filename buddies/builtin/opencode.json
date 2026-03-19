@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "opencode",
+  "display_name": "OpenCode",
+  "binary": "opencode",
+  "search_paths": [
+    "/opt/homebrew/bin/opencode",
+    "/usr/local/bin/opencode",
+    "${HOME}/.local/bin/opencode"
+  ],
+  "version_cmd": ["--version"],
+  "model_config_key": "opencode_model",
+  "modes": ["exec", "review"],
+  "is_local": false,
+  "builtin": true,
+  "adapter_script": "opencode-run.sh",
+  "install_hint": "brew install opencode",
+  "timeout": 120
+}

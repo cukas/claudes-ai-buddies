@@ -12,7 +12,7 @@
       "source": "./",
       "category": "development",
       "homepage": "https://github.com/cukas/claudes-ai-buddies",
-      "tags": ["codex", "gemini", "openai", "peer-ai", "code-review", "brainstorm", "forge", "tribunal", "elo", "claude-code-plugin"]
+      "tags": ["codex", "gemini", "opencode", "minimax", "openai", "peer-ai", "code-review", "brainstorm", "forge", "tribunal", "elo", "claude-code-plugin"]
     }
   ]
 }

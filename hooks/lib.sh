@@ -833,6 +833,9 @@ ai_buddies_codex_model()    { ai_buddies_buddy_model "codex"; }
 ai_buddies_find_gemini()    { ai_buddies_find_buddy "gemini"; }
 ai_buddies_gemini_version() { ai_buddies_buddy_version "gemini"; }
 ai_buddies_gemini_model()   { ai_buddies_buddy_model "gemini"; }
+ai_buddies_find_opencode()    { ai_buddies_find_buddy "opencode"; }
+ai_buddies_opencode_version() { ai_buddies_buddy_version "opencode"; }
+ai_buddies_opencode_model()   { ai_buddies_buddy_model "opencode"; }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Tribunal helpers (v3)
