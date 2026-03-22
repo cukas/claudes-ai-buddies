@@ -36,7 +36,7 @@ Then read the output file path it prints and present the results to the user.
 | `--prompt` | (required) | The question or task for Gemini |
 | `--cwd` | current dir | Working directory for Gemini |
 | `--mode` | `exec` | Always `exec` for this skill |
-| `--timeout` | from config (120s) | Max seconds to wait |
+| `--timeout` | from config (360s) | Max seconds to wait |
 | `--model` | from config | Override the Gemini model |
 | `--sandbox` | `full-auto` | Sandbox mode: `full-auto` or `suggest` |
 

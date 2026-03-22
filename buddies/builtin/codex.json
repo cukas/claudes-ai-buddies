@@ -15,5 +15,5 @@
   "builtin": true,
   "adapter_script": "codex-run.sh",
   "install_hint": "npm install -g @openai/codex",
-  "timeout": 120
+  "timeout": 360
 }

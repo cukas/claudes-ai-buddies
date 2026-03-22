@@ -9,7 +9,7 @@ You have access to OpenCode CLI as a peer AI. It supports multiple providers and
 
 ## How to invoke
 
-Run the wrapper script via Bash:
+Run the wrapper script via Bash. **IMPORTANT:** OpenCode can take 3-6 minutes depending on the model and task complexity. You MUST set the Bash tool's `timeout` parameter to `420000` (7 minutes) to prevent Claude Code from killing the process before OpenCode finishes.
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-run.sh" \

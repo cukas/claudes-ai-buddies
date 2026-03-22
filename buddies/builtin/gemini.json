@@ -15,5 +15,5 @@
   "builtin": true,
   "adapter_script": "gemini-run.sh",
   "install_hint": "npm install -g @google/gemini-cli",
-  "timeout": 120
+  "timeout": 360
 }

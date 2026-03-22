@@ -97,6 +97,8 @@ MANIFEST_PATH=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-run.sh" \
   --timeout "$FORGE_TIMEOUT")
 ```
 
+**IMPORTANT:** Set the Bash tool's `timeout` parameter to `600000` (10 minutes) for synchronous forge runs. The default Bash timeout (120s) will kill slow engines mid-execution.
+
 **Important:** Always pass `--cwd` to bind the forge to the correct repository, especially in async/background mode.
 
 **Async (when `--async` flag is set):**

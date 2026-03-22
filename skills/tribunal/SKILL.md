@@ -47,6 +47,8 @@ AVAILABLE=$(ai_buddies_available_buddies)
 
 ### Phase 1: Dispatch
 
+**IMPORTANT:** Set the Bash tool's `timeout` parameter to `600000` (10 minutes). The default Bash timeout (120s) will kill slow engines mid-debate.
+
 ```bash
 MANIFEST_PATH=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/tribunal-run.sh" \
   --question "THE_QUESTION" \

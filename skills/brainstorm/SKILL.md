@@ -40,10 +40,12 @@ For each available buddy (excluding claude — you ARE claude), dispatch in para
 
 ```bash
 # For each buddy ID in the available list:
-ai_buddies_dispatch_buddy "BUDDY_ID" "$(pwd)" "ASSESSMENT_PROMPT" 120 "/tmp" "${CLAUDE_PLUGIN_ROOT}"
+ai_buddies_dispatch_buddy "BUDDY_ID" "$(pwd)" "ASSESSMENT_PROMPT" 360 "/tmp" "${CLAUDE_PLUGIN_ROOT}"
 ```
 
 Or use the specific adapter scripts for builtin buddies (codex-run.sh, gemini-run.sh).
+
+**IMPORTANT:** When calling via the Bash tool, set `timeout` to `420000` (7 minutes). Codex and OpenCode regularly take 3-6 minutes — the default Bash timeout (120s) will kill them.
 
 Cap at top 4 buddies to keep the table readable.
 
