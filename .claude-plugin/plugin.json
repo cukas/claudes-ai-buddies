@@ -1,7 +1,7 @@
 {
   "name": "claudes-ai-buddies",
   "description": "Dynamic multi-AI buddy system — forge, tribunal, ELO leaderboard, any CLI",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "author": { "name": "cukas" },
   "homepage": "https://github.com/cukas/claudes-ai-buddies",
   "repository": "https://github.com/cukas/claudes-ai-buddies",
