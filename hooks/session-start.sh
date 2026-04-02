@@ -74,7 +74,7 @@ done
 
 # Multi-buddy skills
 if [[ "$has_peer" == "true" ]]; then
-  skills="${skills}, /brainstorm"
+  skills="${skills}, /brainstorm, /campfire"
 fi
 if [[ ${#buddy_ids[@]} -ge 1 ]]; then
   skills="${skills}, /forge"

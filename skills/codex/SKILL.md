@@ -9,7 +9,7 @@ You have access to OpenAI's Codex CLI as a peer AI. Use it to brainstorm, delega
 
 ## How to invoke
 
-Run the wrapper script via Bash:
+Run the wrapper script via Bash. **IMPORTANT:** Codex regularly takes 3-6 minutes for non-trivial tasks. You MUST set the Bash tool's `timeout` parameter to `420000` (7 minutes) to prevent Claude Code from killing the process before Codex finishes.
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" \
@@ -26,8 +26,14 @@ Then read the output file path it prints and present the results to the user.
 2. **Determine the working directory.** Default to the current project root. If the user references a specific repo or directory, use that.
 3. **Run codex-run.sh** with `--mode exec` and the user's prompt via the Bash tool.
 4. **Read the output file** using the Read tool. The script prints the output file path to stdout.
-5. **Present the result** to the user. Frame it as "Codex's perspective" or "Codex says:" — make it clear this came from the peer AI.
-6. **Synthesize if appropriate.** If the user asked for a comparison or second opinion, provide your own perspective alongside Codex's.
+5. **Show Codex's raw response directly.** Use this format — show their actual words, don't paraphrase or summarize:
+
+```
+🔵 **Codex:**
+> [their full response here, verbatim, as a blockquote]
+```
+
+6. **Add your own take only if asked.** If the user wants a comparison or synthesis, add it after Codex's response. Otherwise, let Codex's voice stand on its own.
 
 ## Options
 
@@ -36,7 +42,7 @@ Then read the output file path it prints and present the results to the user.
 | `--prompt` | (required) | The question or task for Codex |
 | `--cwd` | current dir | Working directory for Codex |
 | `--mode` | `exec` | Always `exec` for this skill |
-| `--timeout` | from config (120s) | Max seconds to wait |
+| `--timeout` | from config (360s) | Max seconds to wait |
 | `--model` | from config | Override the Codex model |
 | `--sandbox` | `full-auto` | Sandbox mode: `full-auto` or `suggest` |
 

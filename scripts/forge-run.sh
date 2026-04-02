@@ -25,6 +25,7 @@ CLEAR_SPREAD="$(ai_buddies_forge_clear_winner_spread)"
 ENABLE_SYNTHESIS="$(ai_buddies_forge_enable_synthesis)"
 BASELINE_CHECK="$(ai_buddies_forge_require_baseline_check)"
 CWD=""
+CONVERSATION_CONTEXT=""
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -37,6 +38,7 @@ while [[ $# -gt 0 ]]; do
     --starter)         STARTER="$2";         shift 2 ;;
     --engines)         REQUESTED_ENGINES="$2"; shift 2 ;;
     --cwd)             CWD="$2";              shift 2 ;;
+    --conversation-context) CONVERSATION_CONTEXT="$2"; shift 2 ;;
     *)
       echo "ERROR: Unknown argument: $1" >&2
       exit 1
@@ -162,7 +164,7 @@ _dispatch_engine() {
   local prompt="$3"
   local timeout="$4"
 
-  ai_buddies_dispatch_buddy "$engine" "$wt" "$prompt" "$timeout" "$FORGE_DIR" "$PLUGIN_ROOT" \
+  ai_buddies_dispatch_buddy "$engine" "$wt" "$prompt" "$timeout" "$FORGE_DIR" "$PLUGIN_ROOT" "$CONVERSATION_CONTEXT" \
     > "${FORGE_DIR}/${engine}-output.txt" 2>&1
 }
 

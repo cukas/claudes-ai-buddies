@@ -9,7 +9,7 @@ You have access to OpenCode CLI as a peer AI. It supports multiple providers and
 
 ## How to invoke
 
-Run the wrapper script via Bash:
+Run the wrapper script via Bash. **IMPORTANT:** OpenCode can take 3-6 minutes depending on the model and task complexity. You MUST set the Bash tool's `timeout` parameter to `420000` (7 minutes) to prevent Claude Code from killing the process before OpenCode finishes.
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-run.sh" \
@@ -26,8 +26,14 @@ Then read the output file path it prints and present the results to the user.
 2. **Determine the working directory.** Default to the current project root. If the user references a specific repo or directory, use that.
 3. **Run opencode-run.sh** with `--mode exec` and the user's prompt via the Bash tool.
 4. **Read the output file** using the Read tool. The script prints the output file path to stdout.
-5. **Present the result** to the user. Frame it as "OpenCode's perspective" or "OpenCode says:" — make it clear this came from the peer AI.
-6. **Synthesize if appropriate.** If the user asked for a comparison or second opinion, provide your own perspective alongside OpenCode's.
+5. **Show OpenCode's raw response directly.** Use this format — show their actual words, don't paraphrase or summarize:
+
+```
+🟢 **OpenCode:**
+> [their full response here, verbatim, as a blockquote]
+```
+
+6. **Add your own take only if asked.** If the user wants a comparison or synthesis, add it after OpenCode's response. Otherwise, let OpenCode's voice stand on its own.
 
 ## Options
 

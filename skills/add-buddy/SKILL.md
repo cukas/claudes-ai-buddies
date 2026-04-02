@@ -56,7 +56,7 @@ ai_buddies_find_buddy "ID" && echo "Found" || echo "Not found"
 2. Ask for display name (defaults to the ID).
 3. Ask which modes it supports: `exec` (run tasks), `review` (code review), or both.
 4. Ask for install hint (optional — shown when the binary isn't found).
-5. Ask for timeout (default 120s).
+5. Ask for timeout (default 360s).
 6. Run the registration script with gathered info.
 7. Test if the binary exists on PATH.
 8. Report success.

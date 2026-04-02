@@ -29,7 +29,9 @@ NEEDS: [what you'd need from the user — files, context, access, clarification]
 Task: USER_TASK_HERE
 ```
 
-3. **Detect available buddies and run them in parallel.** Use the dynamic registry:
+3. **Build conversation context (if relevant).** Use your judgment — if the conversation has context the buddies need (constraints, failed approaches, user preferences), summarize it in `$CONVERSATION_CONTEXT`. If the task is self-contained, leave it empty. Keep under ~500 tokens.
+
+4. **Detect available buddies and run them in parallel.** Use the dynamic registry:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"
@@ -40,16 +42,18 @@ For each available buddy (excluding claude — you ARE claude), dispatch in para
 
 ```bash
 # For each buddy ID in the available list:
-ai_buddies_dispatch_buddy "BUDDY_ID" "$(pwd)" "ASSESSMENT_PROMPT" 120 "/tmp" "${CLAUDE_PLUGIN_ROOT}"
+ai_buddies_dispatch_buddy "BUDDY_ID" "$(pwd)" "ASSESSMENT_PROMPT" 360 "/tmp" "${CLAUDE_PLUGIN_ROOT}" "$CONVERSATION_CONTEXT"
 ```
 
 Or use the specific adapter scripts for builtin buddies (codex-run.sh, gemini-run.sh).
 
+**IMPORTANT:** When calling via the Bash tool, set `timeout` to `420000` (7 minutes). Codex and OpenCode regularly take 3-6 minutes — the default Bash timeout (120s) will kill them.
+
 Cap at top 4 buddies to keep the table readable.
 
-4. **Read both output files** (parallel).
-5. **Add your own assessment.** Same format — confidence, approach, risks, needs. Be honest. If you're the best fit, say so. If not, say that too.
-6. **Present the bid table** using the format below.
+5. **Read both output files** (parallel).
+6. **Add your own assessment.** Same format — confidence, approach, risks, needs. Be honest. If you're the best fit, say so. If not, say that too.
+7. **Present the bid table** using the format below.
 
 ## Output format
 

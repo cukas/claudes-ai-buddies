@@ -17,6 +17,7 @@ ROUNDS="$(ai_buddies_tribunal_rounds)"
 MAX_BUDDIES="$(ai_buddies_tribunal_max_buddies)"
 TIMEOUT="$(ai_buddies_forge_timeout)"
 MODE="adversarial"
+CONVERSATION_CONTEXT=""
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -26,6 +27,7 @@ while [[ $# -gt 0 ]]; do
     --rounds)   ROUNDS="$2";      shift 2 ;;
     --buddies)  MAX_BUDDIES="$2"; shift 2 ;;
     --timeout)  TIMEOUT="$2";     shift 2 ;;
+    --conversation-context) CONVERSATION_CONTEXT="$2"; shift 2 ;;
     --mode)
       case "$2" in
         adversarial|socratic|steelman|red-team|synthesis|postmortem) MODE="$2" ;;
@@ -211,7 +213,7 @@ for round in $(seq 1 "$ROUNDS"); do
     # Build round-specific prompt
     tribunal_prompt=$(ai_buddies_build_tribunal_prompt "$QUESTION" "$position" "$round" "$ROUNDS" "$PREV_ROUND_ARGS" "$MODE")
 
-    ai_buddies_dispatch_buddy "$id" "$wt" "$tribunal_prompt" "$TIMEOUT" "$TRIBUNAL_DIR" "$PLUGIN_ROOT" \
+    ai_buddies_dispatch_buddy "$id" "$wt" "$tribunal_prompt" "$TIMEOUT" "$TRIBUNAL_DIR" "$PLUGIN_ROOT" "$CONVERSATION_CONTEXT" \
       > "${TRIBUNAL_DIR}/${id}-round${round}-output.txt" 2>&1 &
     ROUND_PIDS+=($!); _TRIBUNAL_PIDS+=($!)
   done

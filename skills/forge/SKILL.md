@@ -87,6 +87,14 @@ Review proposals, pick best, present to user for approval. Once approved, set `-
 
 **Claude does NOT implement.** Claude dispatches ALL engines (including a Claude subprocess) through forge-run.sh.
 
+**Before dispatching:** Use your judgment — if the conversation contains context that would help the engines (constraints, failed approaches, user preferences, key decisions), summarize it. If the task is self-contained, skip it. Include:
+- The user's original ask and constraints ("must be backwards compatible")
+- Key decisions ("user wants X, not Y")
+- What was already tried and failed
+- Keep under ~500 tokens — actionable facts only, not the full transcript
+
+Store in `$CONVERSATION_CONTEXT` (empty string if no relevant context).
+
 **Synchronous (default):**
 ```bash
 MANIFEST_PATH=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-run.sh" \
@@ -94,8 +102,11 @@ MANIFEST_PATH=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-run.sh" \
   --task "$TASK" \
   --fitness "$FITNESS_CMD" \
   --cwd "$(pwd)" \
-  --timeout "$FORGE_TIMEOUT")
+  --timeout "$FORGE_TIMEOUT" \
+  --conversation-context "$CONVERSATION_CONTEXT")
 ```
+
+**IMPORTANT:** Set the Bash tool's `timeout` parameter to `600000` (10 minutes) for synchronous forge runs. The default Bash timeout (120s) will kill slow engines mid-execution.
 
 **Important:** Always pass `--cwd` to bind the forge to the correct repository, especially in async/background mode.
 
@@ -106,7 +117,8 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/forge-run.sh" \
   --task "$TASK" \
   --fitness "$FITNESS_CMD" \
   --cwd "$(pwd)" \
-  --timeout "$FORGE_TIMEOUT"
+  --timeout "$FORGE_TIMEOUT" \
+  --conversation-context "$CONVERSATION_CONTEXT"
 ```
 Run via Bash tool with `run_in_background: true`.
 

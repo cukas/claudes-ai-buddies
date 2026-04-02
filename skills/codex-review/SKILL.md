@@ -9,7 +9,7 @@ Get a code review from OpenAI's Codex CLI. Reviews uncommitted changes by defaul
 
 ## How to invoke
 
-Run the wrapper script via Bash:
+Run the wrapper script via Bash. **IMPORTANT:** Codex regularly takes 3-6 minutes for non-trivial tasks. You MUST set the Bash tool's `timeout` parameter to `420000` (7 minutes) to prevent Claude Code from killing the process before Codex finishes.
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" \
@@ -50,7 +50,7 @@ Then read the output file and present the review to the user.
 | `--cwd` | current dir | Path to the git repository |
 | `--mode` | — | Must be `review` for this skill |
 | `--review-target` | `uncommitted` | What to review |
-| `--timeout` | from config (120s) | Max seconds to wait |
+| `--timeout` | from config (360s) | Max seconds to wait |
 | `--model` | from config | Override the Codex model |
 
 ## Example invocations

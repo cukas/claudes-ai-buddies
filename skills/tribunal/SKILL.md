@@ -47,13 +47,18 @@ AVAILABLE=$(ai_buddies_available_buddies)
 
 ### Phase 1: Dispatch
 
+**Before dispatching:** Use your judgment — if the conversation contains context that would help the debaters (constraints, failed approaches, user preferences), summarize it in `$CONVERSATION_CONTEXT`. If the question is self-contained, leave it empty.
+
+**IMPORTANT:** Set the Bash tool's `timeout` parameter to `600000` (10 minutes). The default Bash timeout (120s) will kill slow engines mid-debate.
+
 ```bash
 MANIFEST_PATH=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/tribunal-run.sh" \
   --question "THE_QUESTION" \
   --cwd "$(pwd)" \
   --mode MODE_NAME \
   --rounds 2 \
-  --timeout 600)
+  --timeout 600 \
+  --conversation-context "$CONVERSATION_CONTEXT")
 ```
 
 ### Phase 2: Read results
