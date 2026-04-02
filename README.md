@@ -251,6 +251,8 @@ bash tests/run-tests.sh
 |--------|-------------|
 | [**Remembrall**](https://github.com/cukas/remembrall) | Never lose work to context limits |
 | [**Patrol**](https://github.com/cukas/patrol) | ESLint for Claude Code |
+| [**Evil Twin**](https://github.com/cukas/evil-twin) | Adversarial self-challenge + blind verification |
+| [**Hello Claude**](https://github.com/cukas/hello-claude) | Plugin starter template |
 | **AI Buddies** | You are here |
 
 All available via the [claude-plugins](https://github.com/cukas/claude-plugins) monorepo.
