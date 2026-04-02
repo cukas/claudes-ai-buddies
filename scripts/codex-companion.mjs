@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 
 const VERSION = "1.0.0";
 const INIT_TIMEOUT_MS = 8000;
-const TURN_TIMEOUT_MS = 600000; // 10 minutes max per turn
+const TURN_TIMEOUT_MS = 1800000; // 30 minutes — effectively no timeout
 const CLIENT_NAME = "claudes-ai-buddies";
 
 // ── Arg parsing ─────────────────────────────────────────────────────────────────
@@ -268,7 +268,8 @@ class CodexAppServer {
   }
 
   async waitForTurnComplete(timeoutMs) {
-    const deadline = Date.now() + (timeoutMs || TURN_TIMEOUT_MS);
+    const effective = timeoutMs && timeoutMs > 0 ? timeoutMs : TURN_TIMEOUT_MS;
+    const deadline = Date.now() + effective;
     return new Promise((resolve, reject) => {
       const check = () => {
         if (this.turnCompleted) {

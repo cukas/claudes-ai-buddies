@@ -16,7 +16,7 @@
   "adapter_script": "opencode-run.sh",
   "companion_script": "opencode-companion.mjs",
   "install_hint": "brew install opencode",
-  "timeout": 360,
+  "timeout": 0,
   "features": {
     "json_output": true,
     "session_resume": true,

@@ -120,9 +120,10 @@ ai_buddies_sandbox() {
 }
 
 # ── Get default timeout (seconds) ───────────────────────────────────────────
-# Default 360s (6 min) — Codex regularly needs 5-6 min for non-trivial tasks.
+# Default: 0 (no timeout — buddies respond when ready).
+# Set to a positive number to enforce a hard limit.
 ai_buddies_timeout() {
-  ai_buddies_config "timeout" "360"
+  ai_buddies_config "timeout" "0"
 }
 
 # ── Conversational mode ─────────────────────────────────────────────────────
@@ -147,9 +148,16 @@ ai_buddies_is_conversational() {
 
 # ── Timeout wrapper (shared by all scripts) ─────────────────────────────────
 # Usage: ai_buddies_run_with_timeout SECS COMMAND [ARGS...]
+# When SECS is 0 or "none", runs without timeout (buddy responds when ready).
 ai_buddies_run_with_timeout() {
   local timeout_secs="$1"
   shift
+
+  # No timeout — run directly
+  if [[ "$timeout_secs" == "0" || "$timeout_secs" == "none" ]]; then
+    "$@"
+    return $?
+  fi
 
   if command -v gtimeout &>/dev/null; then
     gtimeout "${timeout_secs}s" "$@"

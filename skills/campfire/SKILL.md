@@ -41,20 +41,20 @@ source "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"
 AVAILABLE=$(ai_buddies_available_buddies)  # CSV: "claude,codex,gemini,opencode,..."
 ```
 
-For each available buddy (excluding claude — you ARE claude), dispatch in parallel using their run scripts:
+For each available buddy (excluding claude — you ARE claude), dispatch in parallel using their run scripts. **No timeout** — let them respond when ready:
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" \
-  --prompt "$CAMPFIRE_PROMPT" --cwd "$(pwd)" --mode exec --timeout 120
+  --prompt "$CAMPFIRE_PROMPT" --cwd "$(pwd)" --mode exec --timeout 0
 
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-run.sh" \
-  --prompt "$CAMPFIRE_PROMPT" --cwd "$(pwd)" --mode exec --timeout 120
+  --prompt "$CAMPFIRE_PROMPT" --cwd "$(pwd)" --mode exec --timeout 0
 
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-run.sh" \
-  --prompt "$CAMPFIRE_PROMPT" --cwd "$(pwd)" --mode exec --timeout 120
+  --prompt "$CAMPFIRE_PROMPT" --cwd "$(pwd)" --mode exec --timeout 0
 ```
 
-**Run ALL buddy calls in parallel** using multiple Bash tool calls in a single message. Set `timeout` to `300000` (5 minutes) per call.
+**Run ALL buddy calls in parallel** using multiple Bash tool calls in a single message. Set the Bash tool `timeout` to `600000` (10 minutes) to give them plenty of room. If the user says "stop" or "cancel", interrupt the calls.
 
 5. **Read ALL output files** in parallel.
 
