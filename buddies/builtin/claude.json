@@ -15,5 +15,5 @@
   "builtin": true,
   "adapter_script": "claude-run.sh",
   "install_hint": "npm install -g @anthropic-ai/claude-code",
-  "timeout": 360
+  "timeout": 0
 }

@@ -98,13 +98,16 @@ function runOpenCode(opencodeBin, cliArgs, cwd, timeoutMs) {
     proc.stdout.on("data", (d) => (stdout += d.toString()));
     proc.stderr.on("data", (d) => (stderr += d.toString()));
 
-    const timer = setTimeout(() => {
-      proc.kill("SIGTERM");
-      reject(new Error(`Timeout after ${timeoutMs}ms`));
-    }, timeoutMs);
+    // timeout=0 means no timeout — let the process run until done
+    const timer = timeoutMs > 0
+      ? setTimeout(() => {
+          proc.kill("SIGTERM");
+          reject(new Error(`Timeout after ${timeoutMs}ms`));
+        }, timeoutMs)
+      : null;
 
     proc.on("close", (code) => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
@@ -113,7 +116,7 @@ function runOpenCode(opencodeBin, cliArgs, cwd, timeoutMs) {
     });
 
     proc.on("error", (err) => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       reject(err);
     });
 

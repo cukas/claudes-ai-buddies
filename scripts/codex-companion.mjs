@@ -141,6 +141,10 @@ class CodexAppServer {
 
       case "turn/completed":
         this.turnCompleted = params?.turn;
+        // Check for failed turns
+        if (params?.turn?.status === "failed" || params?.turn?.error) {
+          this.turnError = params.turn.error || { message: `Turn failed with status: ${params.turn.status}` };
+        }
         this.log("turn completed:", params?.turn?.id, "status:", params?.turn?.status);
         break;
 

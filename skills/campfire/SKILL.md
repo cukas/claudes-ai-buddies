@@ -65,22 +65,22 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-run.sh" \
 
 ---
 
-**Codex:**
+🔵 **Codex:**
 > [their full response, verbatim]
 
 ---
 
-**Gemini:**
+🟣 **Gemini:**
 > [their full response, verbatim]
 
 ---
 
-**OpenCode:**
+🟢 **OpenCode:**
 > [their full response, verbatim]
 
 ---
 
-**Claude:**
+🟠 **Claude:**
 > [your own thoughts on the topic — same rules, think freely]
 ```
 

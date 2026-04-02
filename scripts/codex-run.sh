@@ -67,10 +67,12 @@ if [[ -f "$COMPANION" ]] && [[ "$USE_APP_SERVER" == "true" ]] && command -v node
 
   COMPANION_ARGS=()
   if [[ "$MODE" == "review" ]]; then
-    COMPANION_ARGS+=(review --review-target "$REVIEW_TARGET")
-    # For review mode with custom prompt, use custom target
+    # Always preserve the review target scope (uncommitted, branch:X, commit:X)
+    # If user provided extra instructions, append them as custom instructions
     if [[ -n "$PROMPT" && "$PROMPT" != "Review this code" ]]; then
-      COMPANION_ARGS=(review --review-target "custom:${PROMPT}")
+      COMPANION_ARGS+=(review --review-target "${REVIEW_TARGET}" --prompt "$PROMPT")
+    else
+      COMPANION_ARGS+=(review --review-target "$REVIEW_TARGET")
     fi
   elif [[ "$CONVERSATIONAL" == "true" ]]; then
     # Conversational mode: try to resume last thread

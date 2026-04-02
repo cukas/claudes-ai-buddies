@@ -29,7 +29,7 @@ Then read the output file path it prints and present the results to the user.
 5. **Show Codex's raw response directly.** Use this format — show their actual words, don't paraphrase or summarize:
 
 ```
-**Codex:**
+🔵 **Codex:**
 > [their full response here, verbatim, as a blockquote]
 ```
 
