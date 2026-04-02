@@ -26,8 +26,14 @@ Then read the output file path it prints and present the results to the user.
 2. **Determine the working directory.** Default to the current project root. If the user references a specific repo or directory, use that.
 3. **Run codex-run.sh** with `--mode exec` and the user's prompt via the Bash tool.
 4. **Read the output file** using the Read tool. The script prints the output file path to stdout.
-5. **Present the result** to the user. Frame it as "Codex's perspective" or "Codex says:" — make it clear this came from the peer AI.
-6. **Synthesize if appropriate.** If the user asked for a comparison or second opinion, provide your own perspective alongside Codex's.
+5. **Show Codex's raw response directly.** Use this format — show their actual words, don't paraphrase or summarize:
+
+```
+**Codex:**
+> [their full response here, verbatim, as a blockquote]
+```
+
+6. **Add your own take only if asked.** If the user wants a comparison or synthesis, add it after Codex's response. Otherwise, let Codex's voice stand on its own.
 
 ## Options
 

@@ -56,14 +56,86 @@ TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 OUTPUT_FILE="${SESSION_DIR}/codex-output-${TIMESTAMP}.md"
 ERROR_FILE="${SESSION_DIR}/codex-error-${TIMESTAMP}.log"
 
-# ── Build the prompt ─────────────────────────────────────────────────────────
+# ── Try companion (app-server protocol) first ────────────────────────────────
+COMPANION="${PLUGIN_ROOT}/scripts/codex-companion.mjs"
+USE_APP_SERVER="$(ai_buddies_config "use_app_server" "true")"
+
+if [[ -f "$COMPANION" ]] && [[ "$USE_APP_SERVER" == "true" ]] && command -v node &>/dev/null; then
+  ai_buddies_debug "codex-run: trying companion (app-server protocol)"
+
+  CONVERSATIONAL="$(ai_buddies_is_conversational "codex")"
+
+  COMPANION_ARGS=()
+  if [[ "$MODE" == "review" ]]; then
+    COMPANION_ARGS+=(review --review-target "$REVIEW_TARGET")
+    # For review mode with custom prompt, use custom target
+    if [[ -n "$PROMPT" && "$PROMPT" != "Review this code" ]]; then
+      COMPANION_ARGS=(review --review-target "custom:${PROMPT}")
+    fi
+  elif [[ "$CONVERSATIONAL" == "true" ]]; then
+    # Conversational mode: try to resume last thread
+    COMPANION_ARGS+=(resume --prompt "$PROMPT" --ephemeral false)
+  else
+    COMPANION_ARGS+=(task --prompt "$PROMPT")
+  fi
+
+  COMPANION_ARGS+=(
+    --cwd "$CWD"
+    --output "$OUTPUT_FILE"
+    --timeout "$TIMEOUT"
+    --codex-bin "$CODEX_BIN"
+  )
+  [[ -n "$MODEL" ]] && COMPANION_ARGS+=(--model "$MODEL")
+
+  # Map sandbox mode for companion
+  case "$SANDBOX" in
+    full-auto)  COMPANION_ARGS+=(--sandbox "workspace-write") ;;
+    suggest)    COMPANION_ARGS+=(--sandbox "read-only") ;;
+    *)          COMPANION_ARGS+=(--sandbox "$SANDBOX") ;;
+  esac
+
+  COMPANION_EXIT=0
+  node "$COMPANION" "${COMPANION_ARGS[@]}" >/dev/null 2>"$ERROR_FILE" || COMPANION_EXIT=$?
+
+  if [[ $COMPANION_EXIT -eq 0 ]]; then
+    # Companion succeeded — output file path
+    if [[ -f "$OUTPUT_FILE" ]]; then
+      echo "$OUTPUT_FILE"
+      ai_buddies_debug "codex-run: companion succeeded, output at ${OUTPUT_FILE}"
+      exit 0
+    fi
+  elif [[ $COMPANION_EXIT -eq 1 && "$CONVERSATIONAL" == "true" ]]; then
+    # Resume failed (no prior thread) — retry as fresh task
+    ai_buddies_debug "codex-run: resume failed, retrying as fresh task"
+    COMPANION_ARGS=(task --prompt "$PROMPT" --ephemeral false
+      --cwd "$CWD" --output "$OUTPUT_FILE" --timeout "$TIMEOUT" --codex-bin "$CODEX_BIN")
+    [[ -n "$MODEL" ]] && COMPANION_ARGS+=(--model "$MODEL")
+    case "$SANDBOX" in
+      full-auto)  COMPANION_ARGS+=(--sandbox "workspace-write") ;;
+      suggest)    COMPANION_ARGS+=(--sandbox "read-only") ;;
+      *)          COMPANION_ARGS+=(--sandbox "$SANDBOX") ;;
+    esac
+    node "$COMPANION" "${COMPANION_ARGS[@]}" >/dev/null 2>"$ERROR_FILE" || COMPANION_EXIT=$?
+    if [[ $COMPANION_EXIT -eq 0 && -f "$OUTPUT_FILE" ]]; then
+      echo "$OUTPUT_FILE"
+      ai_buddies_debug "codex-run: companion fresh task succeeded"
+      exit 0
+    fi
+  elif [[ $COMPANION_EXIT -eq 2 ]]; then
+    ai_buddies_debug "codex-run: companion reports app-server unavailable, falling back to exec"
+  else
+    ai_buddies_debug "codex-run: companion failed (exit $COMPANION_EXIT), falling back to exec"
+  fi
+fi
+
+# ── Fallback: codex exec (legacy) ───────────────────────────────────────────
+ai_buddies_debug "codex-run: falling back to codex exec"
+
+# Build the prompt
 FINAL_PROMPT="$PROMPT"
 if [[ "$MODE" == "review" ]]; then
   FINAL_PROMPT="$(ai_buddies_build_review_prompt "$PROMPT" "$CWD" "$REVIEW_TARGET")"
 fi
-
-# ── Run codex ────────────────────────────────────────────────────────────────
-ai_buddies_debug "codex-run: executing codex exec"
 
 CODEX_ARGS=(
   exec

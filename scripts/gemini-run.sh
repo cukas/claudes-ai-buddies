@@ -56,22 +56,65 @@ TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 OUTPUT_FILE="${SESSION_DIR}/gemini-output-${TIMESTAMP}.md"
 ERROR_FILE="${SESSION_DIR}/gemini-error-${TIMESTAMP}.log"
 
-# ── Build the prompt ─────────────────────────────────────────────────────────
+# ── Try companion (structured JSON + session resume) first ───────────────────
+COMPANION="${PLUGIN_ROOT}/scripts/gemini-companion.mjs"
+USE_COMPANION="$(ai_buddies_config "use_companion" "true")"
+
+if [[ -f "$COMPANION" ]] && [[ "$USE_COMPANION" == "true" ]] && command -v node &>/dev/null; then
+  ai_buddies_debug "gemini-run: trying companion"
+  CONVERSATIONAL="$(ai_buddies_is_conversational "gemini")"
+
+  COMPANION_ARGS=()
+  if [[ "$MODE" == "review" ]]; then
+    FINAL_PROMPT="$(ai_buddies_build_review_prompt "$PROMPT" "$CWD" "$REVIEW_TARGET")"
+    COMPANION_ARGS+=(review --prompt "$FINAL_PROMPT")
+  elif [[ "$CONVERSATIONAL" == "true" ]]; then
+    COMPANION_ARGS+=(resume --prompt "$PROMPT")
+  else
+    COMPANION_ARGS+=(task --prompt "$PROMPT")
+  fi
+
+  COMPANION_ARGS+=(--cwd "$CWD" --output "$OUTPUT_FILE" --timeout "$TIMEOUT" --gemini-bin "$GEMINI_BIN")
+  [[ -n "$MODEL" ]] && COMPANION_ARGS+=(--model "$MODEL")
+
+  COMPANION_EXIT=0
+  node "$COMPANION" "${COMPANION_ARGS[@]}" >/dev/null 2>"$ERROR_FILE" || COMPANION_EXIT=$?
+
+  if [[ $COMPANION_EXIT -eq 0 && -f "$OUTPUT_FILE" ]]; then
+    echo "$OUTPUT_FILE"
+    ai_buddies_debug "gemini-run: companion succeeded, output at ${OUTPUT_FILE}"
+    exit 0
+  elif [[ $COMPANION_EXIT -eq 1 && "$CONVERSATIONAL" == "true" ]]; then
+    # Resume failed — retry as fresh task
+    ai_buddies_debug "gemini-run: resume failed, retrying as fresh task"
+    COMPANION_ARGS=(task --prompt "$PROMPT" --cwd "$CWD" --output "$OUTPUT_FILE" --timeout "$TIMEOUT" --gemini-bin "$GEMINI_BIN")
+    [[ -n "$MODEL" ]] && COMPANION_ARGS+=(--model "$MODEL")
+    node "$COMPANION" "${COMPANION_ARGS[@]}" >/dev/null 2>"$ERROR_FILE" || COMPANION_EXIT=$?
+    if [[ $COMPANION_EXIT -eq 0 && -f "$OUTPUT_FILE" ]]; then
+      echo "$OUTPUT_FILE"
+      ai_buddies_debug "gemini-run: companion fresh task succeeded"
+      exit 0
+    fi
+  fi
+  ai_buddies_debug "gemini-run: companion failed (exit $COMPANION_EXIT), falling back to legacy"
+fi
+
+# ── Fallback: legacy gemini -p (raw text) ────────────────────────────────────
+ai_buddies_debug "gemini-run: falling back to legacy gemini -p"
+
+# Build the prompt
 FINAL_PROMPT="$PROMPT"
 if [[ "$MODE" == "review" ]]; then
   FINAL_PROMPT="$(ai_buddies_build_review_prompt "$PROMPT" "$CWD" "$REVIEW_TARGET")"
 fi
 
-# ── Map sandbox to gemini CLI flags ──────────────────────────────────────────
+# Map sandbox to gemini CLI flags
 GEMINI_SANDBOX_ARGS=()
 case "$SANDBOX" in
   full-auto) GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode yolo) ;;
   suggest)   GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode default) ;;
   *)         GEMINI_SANDBOX_ARGS=(--sandbox --approval-mode yolo) ;;
 esac
-
-# ── Run gemini ───────────────────────────────────────────────────────────────
-ai_buddies_debug "gemini-run: executing gemini -p"
 
 GEMINI_ARGS=(-p "$FINAL_PROMPT")
 [[ -n "$MODEL" ]] && GEMINI_ARGS+=(--model "$MODEL")

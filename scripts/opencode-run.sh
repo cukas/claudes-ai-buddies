@@ -57,20 +57,60 @@ TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 OUTPUT_FILE="${SESSION_DIR}/opencode-output-${TIMESTAMP}.md"
 ERROR_FILE="${SESSION_DIR}/opencode-error-${TIMESTAMP}.log"
 
-# ── Build the prompt ─────────────────────────────────────────────────────────
+# ── Try companion (structured JSON + session resume) first ───────────────────
+COMPANION="${PLUGIN_ROOT}/scripts/opencode-companion.mjs"
+USE_COMPANION="$(ai_buddies_config "use_companion" "true")"
+
+if [[ -f "$COMPANION" ]] && [[ "$USE_COMPANION" == "true" ]] && command -v node &>/dev/null; then
+  ai_buddies_debug "opencode-run: trying companion"
+  CONVERSATIONAL="$(ai_buddies_is_conversational "opencode")"
+
+  COMPANION_ARGS=()
+  if [[ "$MODE" == "review" ]]; then
+    FINAL_PROMPT="$(ai_buddies_build_review_prompt "$PROMPT" "$CWD" "$REVIEW_TARGET")"
+    COMPANION_ARGS+=(review --prompt "$FINAL_PROMPT")
+  elif [[ "$CONVERSATIONAL" == "true" ]]; then
+    COMPANION_ARGS+=(resume --prompt "$PROMPT")
+  else
+    COMPANION_ARGS+=(task --prompt "$PROMPT")
+  fi
+
+  COMPANION_ARGS+=(--cwd "$CWD" --output "$OUTPUT_FILE" --timeout "$TIMEOUT" --opencode-bin "$OPENCODE_BIN")
+  [[ -n "$MODEL" ]] && COMPANION_ARGS+=(--model "$MODEL")
+
+  COMPANION_EXIT=0
+  node "$COMPANION" "${COMPANION_ARGS[@]}" >/dev/null 2>"$ERROR_FILE" || COMPANION_EXIT=$?
+
+  if [[ $COMPANION_EXIT -eq 0 && -f "$OUTPUT_FILE" ]]; then
+    echo "$OUTPUT_FILE"
+    ai_buddies_debug "opencode-run: companion succeeded, output at ${OUTPUT_FILE}"
+    exit 0
+  elif [[ $COMPANION_EXIT -eq 1 && "$CONVERSATIONAL" == "true" ]]; then
+    # Resume failed — retry as fresh task
+    ai_buddies_debug "opencode-run: resume failed, retrying as fresh task"
+    COMPANION_ARGS=(task --prompt "$PROMPT" --cwd "$CWD" --output "$OUTPUT_FILE" --timeout "$TIMEOUT" --opencode-bin "$OPENCODE_BIN")
+    [[ -n "$MODEL" ]] && COMPANION_ARGS+=(--model "$MODEL")
+    node "$COMPANION" "${COMPANION_ARGS[@]}" >/dev/null 2>"$ERROR_FILE" || COMPANION_EXIT=$?
+    if [[ $COMPANION_EXIT -eq 0 && -f "$OUTPUT_FILE" ]]; then
+      echo "$OUTPUT_FILE"
+      ai_buddies_debug "opencode-run: companion fresh task succeeded"
+      exit 0
+    fi
+  fi
+  ai_buddies_debug "opencode-run: companion failed (exit $COMPANION_EXIT), falling back to legacy"
+fi
+
+# ── Fallback: legacy opencode run (raw text) ─────────────────────────────────
+ai_buddies_debug "opencode-run: falling back to legacy opencode run"
+
+# Build the prompt
 FINAL_PROMPT="$PROMPT"
 if [[ "$MODE" == "review" ]]; then
   FINAL_PROMPT="$(ai_buddies_build_review_prompt "$PROMPT" "$CWD" "$REVIEW_TARGET")"
 fi
 
-# ── Preamble for agent-mode CLIs ─────────────────────────────────────────────
-# opencode runs as a full agent with tools. Without guidance, the model may
-# explore files instead of following a requested response format.
-# This preamble steers priority without restricting tool access.
+# Preamble for agent-mode CLIs
 FINAL_PROMPT="You are a peer AI assistant. When given a specific response format, follow it exactly without performing other actions first. Only use tools if the task explicitly requires reading or modifying files."$'\n\n'"${FINAL_PROMPT}"
-
-# ── Run opencode ──────────────────────────────────────────────────────────────
-ai_buddies_debug "opencode-run: executing opencode run"
 
 OPENCODE_ARGS=(run)
 [[ -n "$MODEL" ]] && OPENCODE_ARGS+=(-m "$MODEL")
@@ -83,8 +123,6 @@ ai_buddies_run_with_timeout "$TIMEOUT" "$OPENCODE_BIN" \
   > "$OUTPUT_FILE" 2>"$ERROR_FILE" || EXIT_CODE=$?
 
 # ── Strip ANSI/OSC escape codes ──────────────────────────────────────────────
-# opencode emits both CSI sequences (\e[...m) and OSC sequences (\e]0;...\a).
-# Strip both for clean output.
 if [[ -f "$OUTPUT_FILE" && -s "$OUTPUT_FILE" ]]; then
   STRIP_TMP="${OUTPUT_FILE}.strip"
   perl -pe 's/\e\[[0-9;]*[a-zA-Z]//g; s/\e\][^\x07]*\x07//g' \

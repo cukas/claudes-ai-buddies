@@ -125,6 +125,26 @@ ai_buddies_timeout() {
   ai_buddies_config "timeout" "360"
 }
 
+# ── Conversational mode ─────────────────────────────────────────────────────
+# When enabled, buddy sessions persist and resume across calls.
+# Global default: false (opt-in). Per-buddy override: {buddy}_conversational.
+# Usage: ai_buddies_is_conversational "codex"  → prints "true" or "false"
+ai_buddies_is_conversational() {
+  local buddy_id="${1:-}"
+  # Per-buddy override takes precedence
+  if [[ -n "$buddy_id" ]]; then
+    local override
+    override="$(ai_buddies_config "${buddy_id}_conversational" "")"
+    if [[ -n "$override" ]]; then
+      echo "$override"
+      return
+    fi
+  fi
+  # Fall back to global setting
+  ai_buddies_config "conversational" "false"
+}
+
+
 # ── Timeout wrapper (shared by all scripts) ─────────────────────────────────
 # Usage: ai_buddies_run_with_timeout SECS COMMAND [ARGS...]
 ai_buddies_run_with_timeout() {
@@ -828,6 +848,12 @@ ai_buddies_dispatch_buddy() {
   local timeout="$4"
   local output_dir="${5:-$(dirname "$wt")}"
   local plugin_root="${6:-${PLUGIN_ROOT:-$(cd "${_AI_BUDDIES_LIB_DIR}/.." 2>/dev/null && pwd)}}"
+  local context="${7:-}"
+
+  # Prepend conversation context as BACKGROUND section if provided
+  if [[ -n "$context" ]]; then
+    prompt="BACKGROUND (conversation context from the user session)"$'\n'"${context}"$'\n\n'"${prompt}"
+  fi
 
   local adapter
   adapter=$(ai_buddies_buddy_config "$id" "adapter_script" "buddy-run.sh")

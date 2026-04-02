@@ -10,10 +10,17 @@
   ],
   "version_cmd": ["--version"],
   "model_config_key": "codex_model",
-  "modes": ["exec", "review"],
+  "modes": ["exec", "review", "resume"],
   "is_local": false,
   "builtin": true,
   "adapter_script": "codex-run.sh",
+  "companion_script": "codex-companion.mjs",
   "install_hint": "npm install -g @openai/codex",
-  "timeout": 360
+  "timeout": 600,
+  "features": {
+    "app_server": true,
+    "thread_resume": true,
+    "native_review": true,
+    "structured_output": true
+  }
 }
