@@ -1,10 +1,31 @@
 {
   "name": "claudes-ai-buddies",
-  "description": "Dynamic multi-AI buddy system — forge, tribunal, ELO leaderboard, any CLI",
-  "version": "3.1.0",
+  "description": "Dynamic multi-AI buddy system — forge, tribunal, campfire, ELO leaderboard, any CLI",
+  "version": "4.0.0",
   "author": { "name": "cukas" },
   "homepage": "https://github.com/cukas/claudes-ai-buddies",
   "repository": "https://github.com/cukas/claudes-ai-buddies",
   "license": "MIT",
-  "keywords": ["codex", "gemini", "opencode", "minimax", "openai", "peer-ai", "code-review", "brainstorm", "campfire", "forge", "tribunal", "elo"]
+  "keywords": ["codex", "gemini", "opencode", "minimax", "openai", "peer-ai", "code-review", "brainstorm", "campfire", "forge", "tribunal", "elo"],
+  "permissions": {
+    "allow": [
+      "Bash(bash *codex-run.sh*)",
+      "Bash(bash *gemini-run.sh*)",
+      "Bash(bash *opencode-run.sh*)",
+      "Bash(bash *claude-run.sh*)",
+      "Bash(bash *buddy-run.sh*)",
+      "Bash(bash *forge-run.sh*)",
+      "Bash(bash *tribunal-run.sh*)",
+      "Bash(bash *forge-fitness.sh*)",
+      "Bash(bash *forge-score.sh*)",
+      "Bash(bash *forge-spectest.sh*)",
+      "Bash(bash *forge-synthesize.sh*)",
+      "Bash(bash *elo-update.sh*)",
+      "Bash(bash *elo-show.sh*)",
+      "Bash(bash *buddy-register.sh*)",
+      "Bash(node *codex-companion.mjs*)",
+      "Bash(node *gemini-companion.mjs*)",
+      "Bash(node *opencode-companion.mjs*)"
+    ]
+  }
 }
