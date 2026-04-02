@@ -150,9 +150,9 @@ ai_buddies_config_set "test_key" "test_value"
 result=$(ai_buddies_config "test_key" "")
 assert_eq "$result" "test_value"
 
-test_start "ai_buddies_timeout returns default 360"
+test_start "ai_buddies_timeout returns default 0 (no timeout)"
 result=$(ai_buddies_timeout)
-assert_eq "$result" "360"
+assert_eq "$result" "0"
 
 test_start "ai_buddies_sandbox returns default full-auto"
 result=$(ai_buddies_sandbox)
@@ -1899,6 +1899,129 @@ assert_contains "$output" "/forge"
 
 test_start "session-start.sh still shows /brainstorm"
 assert_contains "$output" "/brainstorm"
+
+test_start "session-start.sh shows /campfire"
+assert_contains "$output" "/campfire"
+
+# ── Companion scripts & new features ────────────────────────────────────────
+echo ""
+echo "--- Companion scripts ---"
+
+test_start "codex-companion.mjs exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/codex-companion.mjs"
+
+test_start "gemini-companion.mjs exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/gemini-companion.mjs"
+
+test_start "opencode-companion.mjs exists"
+assert_file_exists "${PLUGIN_ROOT}/scripts/opencode-companion.mjs"
+
+test_start "codex-companion.mjs is executable"
+if [[ -x "${PLUGIN_ROOT}/scripts/codex-companion.mjs" ]]; then
+  test_pass
+else
+  test_fail "not executable"
+fi
+
+test_start "codex-companion.mjs --help exits 0"
+result=$(node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" --help 2>&1; echo "EXIT:$?")
+assert_contains "$result" "EXIT:0"
+
+test_start "gemini-companion.mjs --help exits 0"
+result=$(node "${PLUGIN_ROOT}/scripts/gemini-companion.mjs" --help 2>&1; echo "EXIT:$?")
+assert_contains "$result" "EXIT:0"
+
+test_start "opencode-companion.mjs --help exits 0"
+result=$(node "${PLUGIN_ROOT}/scripts/opencode-companion.mjs" --help 2>&1; echo "EXIT:$?")
+assert_contains "$result" "EXIT:0"
+
+# ── Conversational mode tests ───────────────────────────────────────────────
+echo ""
+echo "--- Conversational mode ---"
+
+test_start "ai_buddies_is_conversational default is false"
+result=$(ai_buddies_is_conversational)
+assert_eq "$result" "false"
+
+test_start "ai_buddies_is_conversational reads global config"
+ai_buddies_config_set "conversational" "true"
+result=$(ai_buddies_is_conversational)
+assert_eq "$result" "true"
+ai_buddies_config_set "conversational" "false"
+
+test_start "ai_buddies_is_conversational per-buddy override"
+ai_buddies_config_set "codex_conversational" "true"
+result=$(ai_buddies_is_conversational "codex")
+assert_eq "$result" "true"
+ai_buddies_config_set "codex_conversational" ""
+
+test_start "ai_buddies_is_conversational per-buddy overrides global"
+ai_buddies_config_set "conversational" "true"
+ai_buddies_config_set "codex_conversational" "false"
+result=$(ai_buddies_is_conversational "codex")
+assert_eq "$result" "false"
+ai_buddies_config_set "conversational" "false"
+ai_buddies_config_set "codex_conversational" ""
+
+# ── Timeout=0 (no timeout) tests ───────────────────────────────────────────
+echo ""
+echo "--- Timeout=0 (no timeout) ---"
+
+test_start "ai_buddies_run_with_timeout 0 runs directly"
+result=$(ai_buddies_run_with_timeout 0 echo "hello")
+assert_eq "$result" "hello"
+
+test_start "ai_buddies_run_with_timeout 'none' runs directly"
+result=$(ai_buddies_run_with_timeout none echo "hello")
+assert_eq "$result" "hello"
+
+# ── Context injection tests ─────────────────────────────────────────────────
+echo ""
+echo "--- Context injection ---"
+
+test_start "dispatch_buddy accepts context as 7th arg"
+result_file=$(ai_buddies_dispatch_buddy "claude" "$MOCK_DIR" "test prompt" 5 "/tmp" "$PLUGIN_ROOT" "test context" 2>/dev/null || true)
+if [[ -f "$result_file" ]]; then
+  result_content=$(cat "$result_file")
+else
+  result_content="$result_file"
+fi
+assert_contains "$result_content" "BACKGROUND"
+
+# ── Campfire skill tests ────────────────────────────────────────────────────
+echo ""
+echo "--- Campfire ---"
+
+test_start "campfire SKILL.md exists"
+assert_file_exists "${PLUGIN_ROOT}/skills/campfire/SKILL.md"
+
+test_start "campfire SKILL.md has name field"
+result=$(head -5 "${PLUGIN_ROOT}/skills/campfire/SKILL.md")
+assert_contains "$result" "name: campfire"
+
+# ── Buddy JSON feature fields ──────────────────────────────────────────────
+echo ""
+echo "--- Buddy JSON features ---"
+
+test_start "codex.json has companion_script field"
+result=$(cat "${PLUGIN_ROOT}/buddies/builtin/codex.json")
+assert_contains "$result" "companion_script"
+
+test_start "gemini.json has companion_script field"
+result=$(cat "${PLUGIN_ROOT}/buddies/builtin/gemini.json")
+assert_contains "$result" "companion_script"
+
+test_start "opencode.json has companion_script field"
+result=$(cat "${PLUGIN_ROOT}/buddies/builtin/opencode.json")
+assert_contains "$result" "companion_script"
+
+test_start "codex.json has resume mode"
+result=$(cat "${PLUGIN_ROOT}/buddies/builtin/codex.json")
+assert_contains "$result" "resume"
+
+test_start "codex.json timeout is 0"
+result=$(python3 -c "import json; print(json.load(open('${PLUGIN_ROOT}/buddies/builtin/codex.json'))['timeout'])")
+assert_eq "$result" "0"
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 rm -rf "$MOCK_DIR" "$TEST_HOME"
