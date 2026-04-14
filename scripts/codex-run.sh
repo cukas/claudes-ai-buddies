@@ -152,7 +152,10 @@ CODEX_ARGS+=(
 
 EXIT_CODE=0
 cd "$CWD"
-ai_buddies_run_with_timeout "$TIMEOUT" "$CODEX_BIN" "${CODEX_ARGS[@]}" 2>"$ERROR_FILE" || EXIT_CODE=$?
+# codex exec 0.120.0 reads stdin additively even when a prompt arg is given.
+# Redirect from /dev/null so non-tty contexts (tribunal, forge background) don't
+# error with "stdin is not a terminal".
+ai_buddies_run_with_timeout "$TIMEOUT" "$CODEX_BIN" "${CODEX_ARGS[@]}" < /dev/null 2>"$ERROR_FILE" || EXIT_CODE=$?
 
 # ── Handle result ────────────────────────────────────────────────────────────
 if [[ $EXIT_CODE -eq 124 ]]; then

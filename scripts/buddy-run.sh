@@ -65,7 +65,9 @@ if [[ "$MODE" == "review" ]]; then
 fi
 
 # ── Write prompt to temp file (shell-safe, no interpolation) ─────────────────
-PROMPT_FILE=$(mktemp "${SESSION_DIR}/${BUDDY_ID}-prompt-XXXXXX.txt")
+# No .txt suffix: macOS BSD mktemp doesn't randomize Xs when a suffix follows,
+# creating a literal "XXXXXX.txt" filename that collides on the second tribunal run.
+PROMPT_FILE=$(mktemp "${SESSION_DIR}/${BUDDY_ID}-prompt-XXXXXX")
 printf '%s' "$FINAL_PROMPT" > "$PROMPT_FILE"
 
 # ── Construct and run CLI call ───────────────────────────────────────────────
